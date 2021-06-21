@@ -1,0 +1,5 @@
+move r0 1
+move r1 2
+add r2 r0 r1
+mul r3 r2 r2
+div r4 r3 r1

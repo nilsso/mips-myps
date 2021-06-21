@@ -1,0 +1,10 @@
+[package]
+name = "mips-myps"
+version = "0.1.0"
+edition = "2018"
+
+[dependencies]
+itertools = "*"
+pest = "*"
+pest_derive = "*"
+
