@@ -3,44 +3,52 @@ use std::{fmt, fmt::Display};
 use pest::iterators::Pair;
 
 use crate::ast_traits::OnlyInner;
-use crate::mips::ast::{Reg, Num, AstNode, AstError, AstResult, IntoAst};
+use crate::mips::ast::{Num, MipsNode, MipsResult, IntoMipsNode, Var};
 use crate::mips::{Mips, MipsParser, Rule};
 
 #[derive(Clone, Debug)]
 pub enum Arg {
     Dev,
-    Reg(Reg),
+    Var(Var),
     Num(Num),
     String(String),
 }
 
 impl Arg {
-    pub fn as_reg(&self) -> Option<Reg> {
+    pub fn lifetime(&self) -> Option<(usize, usize)> {
         match self {
-            Self::Reg(reg) => Some(reg.clone()),
+            Self::Var(var) => Some(var.lifetime()),
+            Self::Num(num) => num.lifetime(),
             _ => None,
         }
     }
 
     pub fn update_lifetime(&mut self, s_opt: Option<usize>, e_opt: Option<usize>) {
         match self {
-            Self::Reg(r) => r.update_lifetime(s_opt, e_opt),
+            Self::Var(r) => r.update_lifetime(s_opt, e_opt),
             Self::Num(n) => n.update_lifetime(s_opt, e_opt),
             _ => {},
         }
     }
+
+    pub fn reduce(self) -> Self {
+        match self {
+            Self::Var(var) => Self::Var(var.reduce()),
+            Self::Num(num) => Self::Num(num.reduce()),
+            _ => self,
+        }
+    }
 }
 
-impl<'i> AstNode<'i, Rule, MipsParser, AstError> for Arg {
+impl<'i> MipsNode<'i, Rule, MipsParser> for Arg {
     type Output = Self;
 
     const RULE: Rule = Rule::arg;
 
-    fn try_from_pair(mips: &mut Mips, pair: Pair<Rule>) -> AstResult<Self::Output> {
+    fn try_from_pair(mips: &mut Mips, pair: Pair<Rule>) -> MipsResult<Self::Output> {
         match pair.as_rule() {
             Rule::arg => pair.only_inner().unwrap().try_into_ast(mips),
             Rule::dev => panic!(),
-            Rule::reg => Ok(Self::Reg(pair.try_into_ast(mips).unwrap())),
             Rule::num => panic!(),
             Rule::alias => Ok(Self::String(pair.as_str().into())),
             _ => panic!("{:?}", pair),
@@ -48,9 +56,9 @@ impl<'i> AstNode<'i, Rule, MipsParser, AstError> for Arg {
     }
 }
 
-impl From<Reg> for Arg {
-    fn from(reg: Reg) -> Self {
-        Self::Reg(reg)
+impl From<Var> for Arg {
+    fn from(var: Var) -> Self {
+        Self::Var(var)
     }
 }
 
@@ -70,9 +78,9 @@ impl Display for Arg {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Self::Dev => panic!(),
-            Self::Reg(t) => write!(f, "{}", t),
-            Self::Num(t) => write!(f, "{}", t),
-            Self::String(t) => write!(f, "{}", t),
+            Self::Var(v) => write!(f, "{}", v),
+            Self::Num(n) => write!(f, "{}", n),
+            Self::String(s) => write!(f, "{}", s),
         }
     }
 }

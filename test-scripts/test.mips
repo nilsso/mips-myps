@@ -1,5 +1,16 @@
-move r0 1
-move r1 2
-add r2 r0 r1
-mul r3 r2 r2
-div r4 r3 r1
+define A 1
+define B 2
+
+alias x r2
+alias y r4
+alias z r6
+move x A
+move y B
+add z x y
+
+alias x r1
+alias y r3
+alias z r5
+move x A
+move y B
+add z x y

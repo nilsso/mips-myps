@@ -8,11 +8,12 @@ num = @{ int_part ~ ("." ~ dec_part)? ~ ((^"e" | ^"E") ~ exp_part)? }
 line = ${ SOI ~ ws* ~ stmt? ~ ws* ~ comment? ~ EOI }
     stmt = { instr ~ (ws+ ~ arg)* }
         instr = @{ ASCII_ALPHA+ }
-        arg = _{ dev | reg | num | alias }
-            dev = ${ "d" ~ "r"* ~ index+ }
-            reg = ${ "r"+ ~ index }
-                index = @{ ASCII_DIGIT+ }
-            alias = @{ ASCII_ALPHA+ ~ ASCII_ALPHANUMERIC* }
+        arg = _{ dev | num | var }
+            dev = ${ "d" ~ "r"* ~ index }
+            var = { reg | alias }
+                reg = ${ "r"+ ~ index }
+                    index = @{ ASCII_DIGIT+ }
+                alias = @{ ASCII_ALPHA+ ~ ASCII_ALPHANUMERIC* }
 
 comment = @{ "#" ~ (!NEWLINE ~ ANY)* }
 ws = _{ " " }

@@ -96,72 +96,70 @@ where
     }
 }
 
-// impl<'i, R> FirstLastInne
+///// Abstract syntax tree conversion traits.
+/////
+///// Provided an implementation of [`try_from_pair`](`AstNode::try_from_pair`),
+///// provides additional conversion functions from `&str` and `&Path` as well as
+///// error-less but panicking versions.
+//pub trait AstNode<'i, R, P, E>
+//where
+//    Self: Sized,
+//    R: RuleType,
+//    P: Parser<R>,
+//    E: From<PegError<R>> + From<AstError> + From<IOError> + Debug,
+//{
+//    type Output: Debug;
 
-/// Abstract syntax tree conversion traits.
-///
-/// Provided an implementation of [`try_from_pair`](`AstNode::try_from_pair`),
-/// provides additional conversion functions from `&str` and `&Path` as well as
-/// error-less but panicking versions.
-pub trait AstNode<'i, R, P, E>
-where
-    Self: Sized,
-    R: RuleType,
-    P: Parser<R>,
-    E: From<PegError<R>> + From<AstError> + From<IOError> + Debug,
-{
-    type Output: Debug;
+//    const RULE: R;
 
-    const RULE: R;
+//    fn try_from_pair(pair: Pair<R>) -> Result<Self::Output, E>;
 
-    fn try_from_pair(pair: Pair<R>) -> Result<Self::Output, E>;
+//    fn try_from_str<S: AsRef<str>>(source: &S) -> Result<Self::Output, E> {
+//        let pairs = P::parse(Self::RULE, source.as_ref())?;
+//        pairs.only_inner().map_err(E::from).and_then(Self::try_from_pair)
+//    }
 
-    fn try_from_str<S: AsRef<str>>(source: &S) -> Result<Self::Output, E> {
-        let pairs = P::parse(Self::RULE, source.as_ref())?;
-        pairs.only_inner().map_err(E::from).and_then(Self::try_from_pair)
-    }
+//    fn try_from_file(path: &Path) -> Result<Self::Output, E> {
+//        let input = fs::read_to_string(path)?;
+//        Self::try_from_str(&input)
+//    }
 
-    fn try_from_file(path: &Path) -> Result<Self::Output, E> {
-        let input = fs::read_to_string(path)?;
-        Self::try_from_str(&input)
-    }
+//    fn from_pair(pair: Pair<R>) -> Self::Output {
+//        Self::try_from_pair(pair).unwrap()
+//    }
 
-    fn from_pair(pair: Pair<R>) -> Self::Output {
-        Self::try_from_pair(pair).unwrap()
-    }
+//    fn from_str<S: AsRef<str>>(source: &S) -> Self::Output {
+//        Self::try_from_str(source).unwrap()
+//    }
 
-    fn from_str<S: AsRef<str>>(source: &S) -> Self::Output {
-        Self::try_from_str(source).unwrap()
-    }
+//    fn from_file(path: &Path) -> Self::Output {
+//        Self::try_from_file(path).unwrap()
+//    }
+//}
 
-    fn from_file(path: &Path) -> Self::Output {
-        Self::try_from_file(path).unwrap()
-    }
-}
+// /// Pair into [`AstNode`] conversion trait.
+// pub trait IntoAst<'i, R, P, E>
+// where
+//     Self: Sized,
+//     R: RuleType,
+//     P: Parser<R>,
+//     E: From<PegError<R>> + From<AstError> + From<IOError> + Debug,
+// {
+//     fn try_into_ast<A: AstNode<'i, R, P, E, Output = A>>(self) -> Result<A, E>;
 
-/// Pair into [`AstNode`] conversion trait.
-pub trait IntoAst<'i, R, P, E>
-where
-    Self: Sized,
-    R: RuleType,
-    P: Parser<R>,
-    E: From<PegError<R>> + From<AstError> + From<IOError> + Debug,
-{
-    fn try_into_ast<A: AstNode<'i, R, P, E, Output = A>>(self) -> Result<A, E>;
+//     fn into_ast<A: AstNode<'i, R, P, E, Output = A>>(self) -> A {
+//         Self::try_into_ast(self).unwrap()
+//     }
+// }
 
-    fn into_ast<A: AstNode<'i, R, P, E, Output = A>>(self) -> A {
-        Self::try_into_ast(self).unwrap()
-    }
-}
-
-impl<'i, R, P, E> IntoAst<'i, R, P, E> for Pair<'i, R>
-where
-    R: RuleType,
-    P: Parser<R>,
-    E: From<PegError<R>> + From<AstError> + From<IOError> + Debug,
-{
-    fn try_into_ast<A: AstNode<'i, R, P, E, Output = A>>(self) -> Result<A, E> {
-        A::try_from_pair(self)
-    }
-}
+// impl<'i, R, P, E> IntoAst<'i, R, P, E> for Pair<'i, R>
+// where
+//     R: RuleType,
+//     P: Parser<R>,
+//     E: From<PegError<R>> + From<AstError> + From<IOError> + Debug,
+// {
+//     fn try_into_ast<A: AstNode<'i, R, P, E, Output = A>>(self) -> Result<A, E> {
+//         A::try_from_pair(self)
+//     }
+// }
 

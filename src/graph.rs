@@ -109,7 +109,7 @@ impl Graph {
     fn try_n_color(&self, n: usize) -> Result<Self, ()> {
         let colors = (0..n).collect::<BTreeSet<_>>();
         let mut graph = self.clone();
-        for i in 0..graph.nodes.len() {
+        for i in self.nodes.keys() {
             let adjacent_colors = graph.adjacent_colors(&i);
             let opt = colors.difference(&adjacent_colors).next();
             if let Some(color) = opt {
