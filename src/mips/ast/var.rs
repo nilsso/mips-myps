@@ -19,13 +19,6 @@ pub enum Var {
 }
 
 impl Var {
-    pub fn name(&self) -> String {
-        match self {
-            Self::Reg { reg, .. } => format!("{}", reg),
-            Self::Alias { name, .. } => name.clone(),
-        }
-    }
-
     pub fn reg(&self) -> &Reg {
         match self {
             Self::Reg { reg, .. } => reg,
@@ -38,6 +31,20 @@ impl Var {
             Var::Reg { indirections: 0, reg }
         } else {
             self
+        }
+    }
+
+    pub fn update_reg(&mut self, mips: &Mips) {
+        match self {
+            Var::Reg { reg, .. } | Var::Alias { reg, .. } => {
+                *reg = mips
+                    .aliases
+                    .get(&reg.to_string())
+                    .unwrap()
+                    .reg()
+                    .unwrap()
+                    .clone();
+            }
         }
     }
 

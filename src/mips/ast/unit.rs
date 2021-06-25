@@ -1,43 +1,12 @@
 use std::{fmt, fmt::Display};
 
 use itertools::join;
-use pest::iterators::Pair;
 
-use crate::ast_traits::NextPair;
-#[allow(unused_imports)]
-use crate::mips::ast::{
-    MipsNode,
-    MipsResult,
-    Arg,
-    Num,
-    Reg,
-    Var,
-};
-use crate::mips::{
-    Alias,
-    Mips,
-    MipsError,
-    MipsParser,
-    Rule,
-};
+use crate::ast_traits::{AstNode, AstPair, AstPairs, IntoAst};
+use crate::mips::ast::{Arg, Reg, Num, NumLit, LineAbs, LineRel};
+use crate::mips::{MipsError, MipsParser, MipsResult, Pair, Rule, Alias};
 
 macro_rules! def_unit {
-    (@try_into_arg $mips:ident, $arg_pair:ident, $ast_kind:ty, $arg_kind:path) => {{
-        let arg: Arg = <$ast_kind>::try_from_pair($mips, $arg_pair)?.into();
-        if !matches!(arg, $arg_kind(..)) {
-            panic!("Wrong argument {:?}", arg);
-        }
-        arg
-    }};
-
-    (@test $inner_iter:ident, $arg_kind:path) => {{
-        let arg: Arg = $inner_iter.next().unwrap().into();
-        if matches!(arg, $arg_kind) {
-            panic!();
-        }
-        arg
-    }};
-
     ($(
         ($kind:ident, $n_args:literal, $disp:literal, $try:ident, [$(($ast_kind:ty, $arg_kind:path)),*$(,)*])
     ),*$(,)*) => {
@@ -46,6 +15,7 @@ macro_rules! def_unit {
             $(
                 $kind([Arg; $n_args], Option<String>),
             )*
+            Label([Arg; 1], Option<String>),
             Empty([Arg; 0], Option<String>),
         }
 
@@ -53,19 +23,18 @@ macro_rules! def_unit {
             $(
                 #[allow(unused_variables, unused_mut)]
                 pub fn $try(
-                    mips: &mut Mips,
-                    arg_pairs: Vec<Pair<Rule>>,
-                    comment: Option<String>
+                    arg_pairs: Vec<Pair>,
+                    comment_opt: Option<String>
                 ) -> MipsResult<Self> {
                     let n_args = arg_pairs.len();
                     if n_args != $n_args {
-                        return Err(MipsError::args_wrong_amount($n_args, n_args));
+                        return Err(MipsError::args_wrong_num($n_args, n_args));
                     }
                     let mut iter = arg_pairs.into_iter();
                     let args: [Arg; $n_args] = [
                         $({
                             let pair = iter.next().unwrap();
-                            let ast = <$ast_kind>::try_from_pair(mips, pair)?;
+                            let ast = <$ast_kind>::try_from_pair(pair)?;
                             let arg = ast.into();
                             // if !matches!(arg, $arg_kind(..)) {
                             //     return Err(MipsError::arg_wrong_kind(stringify!($arg_kind), &arg));
@@ -73,22 +42,21 @@ macro_rules! def_unit {
                             arg
                         }),*
                     ];
-                    let unit = Unit::$kind(args, comment);
+                    let unit = Unit::$kind(args, comment_opt);
                     Ok(unit)
                 }
             )*
 
             pub fn try_from_name(
-                mips: &mut Mips,
                 instr: &str,
-                args: Vec<Pair<Rule>>,
-                comment: Option<String>
+                args: Vec<Pair>,
+                comment_opt: Option<String>
             ) -> MipsResult<Self> {
                 match instr {
                     $(
-                        $disp => Self::$try(mips, args, comment),
+                        $disp => Self::$try(args, comment_opt),
                     )*
-                    _ => panic!(),
+                    _ => Err(MipsError::instr_unknown(instr)),
                 }
             }
 
@@ -97,6 +65,7 @@ macro_rules! def_unit {
                     $(
                         Self::$kind(args, _) => args,
                     )*
+                    Self::Label(args, _) => args,
                     Self::Empty(args, _) => args,
                 }
             }
@@ -106,6 +75,7 @@ macro_rules! def_unit {
                     $(
                         Self::$kind(args, _) => args,
                     )*
+                    Self::Label(args, _) => args,
                     Self::Empty(args, _) => args,
                 }
             }
@@ -118,10 +88,34 @@ macro_rules! def_unit {
                 self.args_mut().iter_mut()
             }
 
-            pub fn reduce_args(&mut self) {
-                for arg in self.iter_args_mut() {
-                    *arg = arg.clone().reduce();
+            // pub fn reduce_args(&mut self) {
+            //     for arg in self.iter_args_mut() {
+            //         *arg = arg.clone().reduce();
+            //     }
+            // }
+
+            pub fn comment(&self) -> &Option<String> {
+                match self {
+                    $(
+                        Self::$kind(_, comment_opt) => comment_opt,
+                    )*
+                    Self::Label(_, comment_opt) => comment_opt,
+                    Self::Empty(_, comment_opt) => comment_opt,
                 }
+            }
+
+            pub fn comment_mut(&mut self) -> &mut Option<String> {
+                match self {
+                    $(
+                        Self::$kind(_, comment_opt) => comment_opt,
+                    )*
+                    Self::Label(_, comment_opt) => comment_opt,
+                    Self::Empty(_, comment_opt) => comment_opt,
+                }
+            }
+
+            pub fn has_comment(&self) -> bool {
+                self.comment().is_some()
             }
         }
 
@@ -140,6 +134,13 @@ macro_rules! def_unit {
                             }
                         },
                     )*
+                    Self::Label([Arg::String(label)], comment_opt) => {
+                        if let Some(comment) = comment_opt {
+                            write!(f, "{}: {}", label, comment)
+                        } else {
+                            write!(f, "{}:", label)
+                        }
+                    }
                     Self::Empty(_, comment_opt) => {
                         if let Some(comment) = comment_opt {
                             write!(f, "{}", comment)
@@ -147,6 +148,7 @@ macro_rules! def_unit {
                             Ok(())
                         }
                     }
+                    _ => unreachable!(),
                 }
             }
         }
@@ -213,15 +215,15 @@ def_unit!(
     // (Brgtz,  2, "brgtz",  try_brgtz,  [(UnitNum, a), (UnitLine, l)]),
     // (Brle,   3, "brle",   try_brle,   [(UnitNum, a), (UnitNum, b), (UnitLine, l)]),
     // (Brlez,  2, "brlez",  try_brlez,  [(UnitNum, a), (UnitLine, l)]),
-    (Brlt,   3, "brlt",   try_brlt,   [(Num, Arg::Num), (Num, Arg::Num), (Num, Arg::Num)]),
+    // (Brlt,   3, "brlt",   try_brlt,   [(Num, Arg::Num), (Num, Arg::Num), (LineNum, Arg::Num)]),
     // (Brltz,  2, "brltz",  try_brltz,  [(UnitNum, a), (UnitLine, l)]),
     // (Brna
     // (Brnaz
     // (Brne,   3, "brne",   try_brne,   [(UnitNum, a), (UnitNum, b), (UnitLine, l)]),
     // (Brnez,  2, "brnez",  try_brnez,  [(UnitNum, a), (UnitLine, l)]),
-    // (J,      1, "j",      try_j,      [(UnitLine, l)]),
+    (J,      1, "j",      try_j,      [(LineAbs, Arg::LineAbs)]),
     // (Jal,    1, "jal",    try_jal,    [(UnitLine, l)]),
-    // (Jr,     1, "jr",     try_jr,     [(UnitLine, l)]),
+    (Jr,     1, "jr",     try_jr,     [(LineRel, Arg::LineRel)]),
 
     // Variable Selection
     // (Sap
@@ -247,24 +249,24 @@ def_unit!(
     // Mathematical Operations
     // (Abs,    2, "abs",    try_abs,    [(UnitVar, r), (UnitNum, a)]),
     // (Acos,   2, "acos",   try_acos,   [(UnitVar, r), (UnitNum, a)]),
-    (Add,    3, "add",    try_add,    [(Reg, Arg::Var), (Num, Arg::Num), (Num, Arg::Num)]),
+    (Add,    3, "add",    try_add,    [(Reg, Arg::Reg), (Num, Arg::Num), (Num, Arg::Num)]),
     // (Asin,   2, "asin",   try_asin,   [(UnitVar, r), (UnitNum, a)]),
     // (Atan,   2, "atan",   try_atan,   [(UnitVar, r), (UnitNum, a)]),
     // (Ceil,   2, "ceil",   try_ceil,   [(UnitVar, r), (UnitNum, a)]),
     // (Cos,    2, "cos",    try_cos,    [(UnitVar, r), (UnitNum, a)]),
-    (Div,    3, "div",    try_div,    [(Num, Arg::Num), (Num, Arg::Num), (Num, Arg::Num)]),
+    (Div,    3, "div",    try_div,    [(Reg, Arg::Reg), (Num, Arg::Num), (Num, Arg::Num)]),
     // (Exp,    2, "expr",   try_exp,    [(UnitVar, r), (UnitNum, a)]),
     // (Floor,  2, "floor",  try_floor,  [(UnitVar, r), (UnitNum, a)]),
     // (Log,    2, "log",    try_log,    [(UnitVar, r), (UnitNum, a)]),
     // (Max,    3, "max",    try_max,    [(UnitVar, r), (UnitNum, a), (UnitNum, b)]),
     // (Min,    3, "min",    try_min,    [(UnitVar, r), (UnitNum, a), (UnitNum, b)]),
     // (Mod,    3, "mod",    try_mod,    [(UnitVar, r), (UnitNum, a), (UnitNum, b)]),
-    (Mul,    3, "mul",    try_mul,    [(Num, Arg::Num), (Num, Arg::Num), (Num, Arg::Num)]),
+    (Mul,    3, "mul",    try_mul,    [(Reg, Arg::Reg), (Num, Arg::Num), (Num, Arg::Num)]),
     // (Rand,   1, "rand",   try_rand,   [(UnitVar, r)]),
     // (Round,  2, "round",  try_round,  [(UnitVar, r), (UnitNum, a)]),
     // (Sin,    2, "sin",    try_sin,    [(UnitVar, r), (UnitNum, a)]),
     // (Sqrt,   2, "sqrt",   try_sqrt,   [(UnitVar, r), (UnitNum, a)]),
-    (Sub,    3, "sub",    try_sub,    [(Num, Arg::Num), (Num, Arg::Num), (Num, Arg::Num)]),
+    (Sub,    3, "sub",    try_sub,    [(Reg, Arg::Reg), (Num, Arg::Num), (Num, Arg::Num)]),
     // (Tan,    2, "tan",    try_tan,    [(UnitVar, r), (UnitNum, a)]),
     // (Trunc,  2, "trunc",  try_trunc,  [(UnitVar, r), (UnitNum, a)]),
 
@@ -281,80 +283,94 @@ def_unit!(
 
     // Misc
     (Alias,  2, "alias",  try_alias,  [(String, Arg::String), (Reg, Arg::Var)]),
-    (Define, 2, "define", try_define, [(String, Arg::String), (Num, Arg::Num)]),
+    (Define, 2, "define", try_define, [(String, Arg::String), (NumLit, Arg::Num)]),
     (Hcf,    0, "hcf",    try_hcf,    []),
     (Move,   2, "move",   try_move,   [(Reg, Arg::Var), (Num, Arg::Num)]),
     (Sleep,  1, "sleep",  try_sleep,  [(Num, Arg::Num)]),
     (Yield,  0, "yield",  try_yield,  []),
 );
 
+/*
+ * branches have shared numbers
+ * shared numbers are stored in Mips.
+ * When a line is removed, need to decrement shared numbers in range
+ */
+
 impl Unit {
-    pub fn alias_from(&self) -> Option<(String, Alias)> {
-        match self {
-            Unit::Alias([Arg::String(a), Arg::Var(v)], _) => {
-                let name = a.clone();
-                let var = Var::Alias {
-                    name: name.clone(),
-                    reg: v.reg().clone(),
-                };
-                let alias = Alias::Var(var);
-                Some((name, alias))
-            }
-            Unit::Define([Arg::String(a), Arg::Num(n)], _) => {
-                let name = a.clone();
-                let alias = Alias::Num(n.clone());
-                Some((name, alias))
-            }
-            _ => {
-                if let Some(Arg::Var(var)) = self.iter_args().next() {
-                    Some((var.to_string(), Alias::Var(var.clone())))
-                } else {
-                    None
-                }
-            }
-        }
+    // pub fn alias_from(&self) -> Option<(String, Alias)> {
+    //     match self {
+    //         Unit::Alias([Arg::String(key), Arg::Reg(reg)], _) => {
+    //             let reg = Reg::new_alias(key.clone(), reg.reg_shared().clone());
+    //             let alias = Alias::Reg(reg);
+    //             Some((key.clone(), alias))
+    //         }
+    //         Unit::Define([Arg::String(key), Arg::Num(num)], _) => {
+    //             let alias = Alias::Num(num.clone());
+    //             Some((key.clone(), alias))
+    //         }
+    //         Unit::Label([Arg::String(key), Arg::LineNum(line_num)], _) => {
+    //             let alias = Alias::LineNum(line_num.clone());
+    //             Some((key.clone(), alias))
+    //         },
+    //         _ => {
+    //             if let Some(Arg::Reg(reg)) = self.iter_args().next() {
+    //                 Some((reg.to_string(), Alias::Reg(reg.clone())))
+    //             } else {
+    //                 None
+    //             }
+    //         }
+    //     }
+    // }
+
+    pub fn get_arg(&self, i: usize) -> Option<&Arg> {
+        self.args().get(i)
     }
+
+    // pub fn update_regs(&mut self, mips: &Mips) {
+    //     for arg in self.iter_args_mut() {
+    //         arg.update_reg(mips);
+    //     }
+    // }
 }
 
-impl<'i> MipsNode<'i, Rule, MipsParser> for Unit {
+impl<'i> AstNode<'i, Rule, MipsParser, MipsError> for Unit {
     type Output = Self;
 
     const RULE: Rule = Rule::line;
 
-    fn try_from_pair(mips: &mut Mips, pair: Pair<Rule>) -> MipsResult<Self::Output> {
+    fn try_from_pair(pair: Pair) -> MipsResult<Self> {
         let pairs = pair.into_inner();
 
-        let mut stmt_pair_opt = None;
+        let mut unit_pair_opt = None;
         let mut comment_pair_opt = None;
 
         for pair in pairs {
             match pair.as_rule() {
-                Rule::stmt => stmt_pair_opt = Some(pair),
+                Rule::unit => unit_pair_opt = Some(pair.only_inner()?),
                 Rule::comment => comment_pair_opt = Some(pair.as_str().into()),
                 Rule::EOI => {}
                 _ => panic!("{:?}", pair),
             }
         }
 
-        let unit = if let Some(stmt_pair) = stmt_pair_opt {
-            let mut pairs = stmt_pair.into_inner();
 
-            let instr_pair = pairs.next_pair()?;
-            let arg_pairs = pairs.collect();
-
-            Self::try_from_name(mips, instr_pair.as_str(), arg_pairs, comment_pair_opt)?
+        if let Some(unit_pair) = unit_pair_opt {
+            match unit_pair.as_rule() {
+                Rule::label => {
+                    let label = unit_pair.as_str().to_string();
+                    Ok(Self::Label([label.into()], comment_pair_opt))
+                },
+                Rule::stmt => {
+                    let mut pairs = unit_pair.into_inner();
+                    let instr_pair = pairs.next_pair()?;
+                    let arg_pairs = pairs.collect();
+                    Self::try_from_name(instr_pair.as_str(), arg_pairs, comment_pair_opt)
+                },
+                _ => unreachable!("{:?}", unit_pair),
+            }
         } else {
-            Self::Empty([], comment_pair_opt)
-        };
-
-        // match &unit {
-        //     Unit::Alias([Arg::String(k), Arg::Var(var)], _) => {
-        //         mips.aliases.insert(k.clone(), Alias::Reg(reg.clone()));
-        //     }
-        //     _ => {}
-        // }
-
-        Ok(unit)
+            Ok(Self::Empty([], comment_pair_opt))
+        }
     }
 }
 
@@ -365,7 +381,7 @@ impl<'i> MipsNode<'i, Rule, MipsParser> for Unit {
 
 //     const RULE: Rule = Rule::arg;
 
-//     fn try_from_pair(mips: &mut Mips, pair: Pair<Rule>) -> MipsResult<Self::Output> {
+//     fn try_from_pair(mips: &mut Mips, pair: Pair) -> MipsResult<Self::Output> {
 //         match pair.as_rule() {
 //             Rule::dev => {
 //             },

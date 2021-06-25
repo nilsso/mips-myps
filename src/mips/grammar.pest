@@ -5,15 +5,16 @@ num = @{ int_part ~ ("." ~ dec_part)? ~ ((^"e" | ^"E") ~ exp_part)? }
     dec_part = @{ ASCII_DIGIT+ }
     exp_part = @{ int }
 
-line = ${ SOI ~ ws* ~ stmt? ~ ws* ~ comment? ~ EOI }
-    stmt = { instr ~ (ws+ ~ arg)* }
-        instr = @{ ASCII_ALPHA+ }
-        arg = _{ dev | num | var }
-            dev = ${ "d" ~ "r"* ~ index }
-            var = { reg | alias }
+line = ${ SOI ~ unit? ~ ws* ~ comment? ~ EOI }
+    unit = { (label ~ ":") | (ws* ~ stmt) }
+        label = @{ ASCII_ALPHA+ }
+        stmt = { instr ~ (ws+ ~ arg)* }
+            instr = @{ ASCII_ALPHA+ }
+            arg = _{ dev | reg | num | alias }
+                dev = ${ "d" ~ "r"* ~ index }
                 reg = ${ "r"+ ~ index }
-                    index = @{ ASCII_DIGIT+ }
                 alias = @{ ASCII_ALPHA+ ~ ASCII_ALPHANUMERIC* }
+                    index = @{ ASCII_DIGIT+ }
 
 comment = @{ "#" ~ (!NEWLINE ~ ANY)* }
 ws = _{ " " }

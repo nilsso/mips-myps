@@ -1,53 +1,27 @@
 use std::{fmt, fmt::Display};
 
-use pest::iterators::Pair;
-
-use crate::ast_traits::OnlyInner;
-use crate::mips::ast::{Num, MipsNode, MipsResult, IntoMipsNode, Var};
-use crate::mips::{Mips, MipsParser, Rule};
+use crate::ast_traits::{AstNode, AstPair, IntoAst};
+use crate::mips::ast::{Reg, Num, NumLit, LineAbs, LineRel};
+use crate::mips::{MipsError, MipsParser, MipsResult, Pair, Rule};
 
 #[derive(Clone, Debug)]
 pub enum Arg {
     Dev,
-    Var(Var),
+    Reg(Reg),
     Num(Num),
+    LineAbs(LineAbs),
+    LineRel(LineRel),
     String(String),
 }
 
-impl Arg {
-    pub fn lifetime(&self) -> Option<(usize, usize)> {
-        match self {
-            Self::Var(var) => Some(var.lifetime()),
-            Self::Num(num) => num.lifetime(),
-            _ => None,
-        }
-    }
-
-    pub fn update_lifetime(&mut self, s_opt: Option<usize>, e_opt: Option<usize>) {
-        match self {
-            Self::Var(r) => r.update_lifetime(s_opt, e_opt),
-            Self::Num(n) => n.update_lifetime(s_opt, e_opt),
-            _ => {},
-        }
-    }
-
-    pub fn reduce(self) -> Self {
-        match self {
-            Self::Var(var) => Self::Var(var.reduce()),
-            Self::Num(num) => Self::Num(num.reduce()),
-            _ => self,
-        }
-    }
-}
-
-impl<'i> MipsNode<'i, Rule, MipsParser> for Arg {
+impl<'i> AstNode<'i, Rule, MipsParser, MipsError> for Arg {
     type Output = Self;
 
     const RULE: Rule = Rule::arg;
 
-    fn try_from_pair(mips: &mut Mips, pair: Pair<Rule>) -> MipsResult<Self::Output> {
+    fn try_from_pair(pair: Pair) -> MipsResult<Self::Output> {
         match pair.as_rule() {
-            Rule::arg => pair.only_inner().unwrap().try_into_ast(mips),
+            Rule::arg => pair.only_inner()?.try_into_ast(),
             Rule::dev => panic!(),
             Rule::num => panic!(),
             Rule::alias => Ok(Self::String(pair.as_str().into())),
@@ -56,15 +30,27 @@ impl<'i> MipsNode<'i, Rule, MipsParser> for Arg {
     }
 }
 
-impl From<Var> for Arg {
-    fn from(var: Var) -> Self {
-        Self::Var(var)
+impl From<Reg> for Arg {
+    fn from(reg: Reg) -> Self {
+        Self::Reg(reg)
     }
 }
 
 impl From<Num> for Arg {
     fn from(num: Num) -> Self {
         Self::Num(num)
+    }
+}
+
+impl From<LineAbs> for Arg {
+    fn from(line_abs: LineAbs) -> Self {
+        Self::LineAbs(line_abs)
+    }
+}
+
+impl From<LineRel> for Arg {
+    fn from(line_rel: LineRel) -> Self {
+        Self::LineRel(line_rel)
     }
 }
 
@@ -78,9 +64,11 @@ impl Display for Arg {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Self::Dev => panic!(),
-            Self::Var(v) => write!(f, "{}", v),
-            Self::Num(n) => write!(f, "{}", n),
-            Self::String(s) => write!(f, "{}", s),
+            Self::Reg(t) => write!(f, "{}", t),
+            Self::Num(t) => write!(f, "{}", t),
+            Self::LineAbs(t) => write!(f, "{}", t),
+            Self::LineRel(t) => write!(f, "{}", t),
+            Self::String(t) => write!(f, "{}", t),
         }
     }
 }

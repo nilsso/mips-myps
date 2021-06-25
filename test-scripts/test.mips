@@ -1,16 +1,5 @@
-define A 1
-define B 2
 
-alias x r2
-alias y r4
-alias z r6
-move x A
-move y B
-add z x y
+move r0 1
+jr -1
 
-alias x r1
-alias y r3
-alias z r5
-move x A
-move y B
-add z x y
+jr -3

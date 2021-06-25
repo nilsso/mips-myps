@@ -1,70 +1,70 @@
 use std::{fmt, fmt::Display};
-use std::boxed::Box;
 
-use pest::iterators::Pair;
-
-use crate::ast_traits::OnlyInner;
-use crate::mips::ast::{Var, MipsNode, MipsResult, Reg};
-use crate::mips::{Mips, MipsParser, Rule};
+use crate::ast_traits::{AstNode, AstPair, IntoAst};
+use crate::mips::ast::Reg;
+use crate::mips::{MipsError, MipsParser, MipsResult, Pair, Rule};
 
 #[derive(Clone, Debug)]
 pub enum Num {
     Lit(f64),
-    Var(Var),
+    Reg(Reg),
+    Alias(String),
 }
 
-impl Num {
-    pub fn reg(&self) -> Option<&Reg> {
-        match self {
-            Self::Lit(_) => None,
-            Self::Var(var) => Some(var.reg()),
-        }
-    }
-
-    pub fn lifetime(&self) -> Option<(usize, usize)> {
-        match self {
-            Self::Var(var) => Some(var.lifetime()),
-            _ => None,
-        }
-    }
-
-    pub fn update_lifetime(&mut self, s_opt: Option<usize>, e_opt: Option<usize>) {
-        match self {
-            Self::Var(r) => r.update_lifetime(s_opt, e_opt),
-            _ => {},
-        }
-    }
-
-    pub fn reduce(self) -> Self {
-        match self {
-            Num::Var(var) => Num::Var(var.reduce()),
-            _ => self,
-        }
-    }
-}
-
-impl<'i> MipsNode<'i, Rule, MipsParser> for Num {
+impl<'i> AstNode<'i, Rule, MipsParser, MipsError> for Num {
     type Output = Self;
 
-    const RULE: Rule = Rule::num;
+    const RULE: Rule = Rule::arg;
 
-    fn try_from_pair(mips: &mut Mips, pair: Pair<Rule>) -> MipsResult<Self> {
-        // println!("try num from {:?}", pair);
+    fn try_from_pair(pair: Pair) -> MipsResult<Self> {
         match pair.as_rule() {
-            Rule::var => Self::try_from_pair(mips, pair.only_inner()?),
             Rule::num => Ok(Self::Lit(pair.as_str().parse().unwrap())),
-            // Rule::reg => Ok(Self::Var(pair.try_into_ast(mips).unwrap())),
-            Rule::alias => mips.get_num(pair.as_str()),
-            _ => panic!("{:?}", pair),
+            Rule::reg => Ok(Self::Reg(pair.try_into_ast()?)),
+            Rule::alias => Ok(Self::Alias(pair.as_str().to_owned())),
+            _ => Err(MipsError::arg_wrong_kind("a number", pair)),
         }
+    }
+}
+
+impl From<f64> for Num {
+    fn from(num: f64) -> Self {
+        Self::Lit(num)
+    }
+}
+
+impl From<Reg> for Num {
+    fn from(reg: Reg) -> Self {
+        Self::Reg(reg.into())
+    }
+}
+
+impl From<String> for Num {
+    fn from(alias: String) -> Self {
+        Self::Alias(alias)
     }
 }
 
 impl Display for Num {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Self::Lit(n) => write!(f, "{}", n),
-            Self::Var(v) => write!(f, "{}", v),
+            Self::Lit(t) => write!(f, "{}", t),
+            Self::Reg(t) => write!(f, "{}", t),
+            Self::Alias(t) => write!(f, "{}", t),
+        }
+    }
+}
+
+pub struct NumLit;
+
+impl<'i> AstNode<'i, Rule, MipsParser, MipsError> for NumLit {
+    type Output = Num;
+
+    const RULE: Rule = Rule::arg;
+
+    fn try_from_pair(pair: Pair) -> MipsResult<Num> {
+        match pair.as_rule() {
+            Rule::num => pair.try_into_ast(),
+            _ => Err(MipsError::arg_wrong_kind("a number literal", pair)),
         }
     }
 }
