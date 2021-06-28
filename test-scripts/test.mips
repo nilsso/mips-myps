@@ -1,5 +1,45 @@
+alias downMem d0
+alias selfMem r1
 
-move r0 1
-jr -1
+alias downReq r0 # FIX
+alias selfReq r1 # FIX
+alias orWord r2 # FIX
+alias i r3 # FIX
 
-jr -3
+alias downWord r4
+alias selfWord r5
+alias downBit r6
+alias selfBit r7
+alias orBit r8
+
+main:
+yield
+
+l downReq downMem Setting
+l selfReq selfMem Setting
+
+move downWord downReq # downWord = downReq
+move selfWord selfReq # selfWord = selfReq
+move orWord 0 # (bit-or start)
+move i 1 # i = 1 = 2^n where n=0
+
+bitOrLoop:
+mod downBit downWord 2 # down word ls-bit (bit-or loop start)
+div downWord downWord 2 # right-shift down word
+trunc downWord downWord
+
+mod selfBit selfWord 2 # least-significant bit of self word
+div selfWord selfWord 2 # right-shift self word
+trunc selfWord selfWord
+
+or orBit downBit selfBit # or the bits
+mul orBit i orBit # make or-bit a power of 2
+add orWord orBit orWord # add to or word
+
+mul i 2 i # i = 2^(n+1)
+bgtz downWord bitOrLoop # continue until words are zero
+bgtz selfWord bitOrLoop
+
+s db Setting orWord
+
+j main

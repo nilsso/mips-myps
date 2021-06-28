@@ -3,19 +3,22 @@ use std::{fmt, fmt::Display};
 use itertools::join;
 
 use crate::ast_traits::{AstNode, AstPair, AstPairs, IntoAst};
-use crate::mips::ast::{Arg, Reg, Num, NumLit, LineAbs, LineRel};
-use crate::mips::{MipsError, MipsParser, MipsResult, Pair, Rule, Alias};
+use crate::mips::ast::{
+    Arg, BatchMode, Dev, DevOrReg, LineAbs, LineRel, MipsNode, Num, NumLit, ReagentMode, Reg,
+    RegBase, RegLit,
+};
+use crate::mips::{Mips, MipsError, MipsParser, MipsResult, Pair, Rule};
 
 macro_rules! def_unit {
     ($(
-        ($kind:ident, $n_args:literal, $disp:literal, $try:ident, [$(($ast_kind:ty, $arg_kind:path)),*$(,)*])
+        ($kind:ident, $n_args:literal, $disp:literal, $try:ident, [$($ast_kind:ty),*$(,)*])
     ),*$(,)*) => {
         #[derive(Clone, Debug)]
         pub enum Unit {
             $(
                 $kind([Arg; $n_args], Option<String>),
             )*
-            Label([Arg; 1], Option<String>),
+            Tag([Arg; 1], Option<String>),
             Empty([Arg; 0], Option<String>),
         }
 
@@ -35,11 +38,7 @@ macro_rules! def_unit {
                         $({
                             let pair = iter.next().unwrap();
                             let ast = <$ast_kind>::try_from_pair(pair)?;
-                            let arg = ast.into();
-                            // if !matches!(arg, $arg_kind(..)) {
-                            //     return Err(MipsError::arg_wrong_kind(stringify!($arg_kind), &arg));
-                            // }
-                            arg
+                            ast.into()
                         }),*
                     ];
                     let unit = Unit::$kind(args, comment_opt);
@@ -65,7 +64,7 @@ macro_rules! def_unit {
                     $(
                         Self::$kind(args, _) => args,
                     )*
-                    Self::Label(args, _) => args,
+                    Self::Tag(args, _) => args,
                     Self::Empty(args, _) => args,
                 }
             }
@@ -75,31 +74,17 @@ macro_rules! def_unit {
                     $(
                         Self::$kind(args, _) => args,
                     )*
-                    Self::Label(args, _) => args,
+                    Self::Tag(args, _) => args,
                     Self::Empty(args, _) => args,
                 }
             }
-
-            pub fn iter_args(&self) -> impl Iterator<Item = &Arg> {
-                self.args().iter()
-            }
-
-            pub fn iter_args_mut(&mut self) -> impl Iterator<Item = &mut Arg> {
-                self.args_mut().iter_mut()
-            }
-
-            // pub fn reduce_args(&mut self) {
-            //     for arg in self.iter_args_mut() {
-            //         *arg = arg.clone().reduce();
-            //     }
-            // }
 
             pub fn comment(&self) -> &Option<String> {
                 match self {
                     $(
                         Self::$kind(_, comment_opt) => comment_opt,
                     )*
-                    Self::Label(_, comment_opt) => comment_opt,
+                    Self::Tag(_, comment_opt) => comment_opt,
                     Self::Empty(_, comment_opt) => comment_opt,
                 }
             }
@@ -109,13 +94,9 @@ macro_rules! def_unit {
                     $(
                         Self::$kind(_, comment_opt) => comment_opt,
                     )*
-                    Self::Label(_, comment_opt) => comment_opt,
+                    Self::Tag(_, comment_opt) => comment_opt,
                     Self::Empty(_, comment_opt) => comment_opt,
                 }
-            }
-
-            pub fn has_comment(&self) -> bool {
-                self.comment().is_some()
             }
         }
 
@@ -134,11 +115,11 @@ macro_rules! def_unit {
                             }
                         },
                     )*
-                    Self::Label([Arg::String(label)], comment_opt) => {
+                    Self::Tag([Arg::String(tag)], comment_opt) => {
                         if let Some(comment) = comment_opt {
-                            write!(f, "{}: {}", label, comment)
+                            write!(f, "{}: {}", tag, comment)
                         } else {
-                            write!(f, "{}:", label)
+                            write!(f, "{}:", tag)
                         }
                     }
                     Self::Empty(_, comment_opt) => {
@@ -158,135 +139,135 @@ macro_rules! def_unit {
 #[rustfmt::skip]
 def_unit!(
         // Device IO
-    // (Bdns,   2, "bdns",   try_bdns,   [(UnitDev, d), (UnitLine, l)]),
-    // (Bdnsal, 2, "bdnsal", try_bdnsal, [(UnitDev, d), (UnitLine, l)]),
-    // (Bdse,   2, "bdse",   try_bdse,   [(UnitDev, d), (UnitLine, l)]),
-    // (Bdseal, 2, "bdseal", try_bdseal, [(UnitDev, d), (UnitLine, l)]),
-    // (Brdns,  2, "brdns",  try_brdns,  [(UnitDev, d), (UnitLine, l)]),
-    // (Brdse,  2, "brdse",  try_brdse,  [(UnitDev, d), (UnitLine, l)]),
-    // (L,      3, "l",      try_l,      [(UnitVar, r), (UnitDev, d), (String, p)]),
-    // (Lb,     4, "lb",     try_lb,     [(UnitVar, r), (UnitDevNet, d), (String, p), (Mode, m)]),
-    // (Lr
-    // (Ls,     4, "ls",     try_ls,     [(UnitVar, r), (UnitDev, d), (UnitNum, i), (String, p)]),
-    // (S,      3, "s",      try_s,      [(UnitDev, d), (String, p), (UnitNum, r)]),
-    // (Sb,     3, "sb",     try_sb,     [(UnitDevNet, d), (String, p), (UnitNum, r)]),
+    (Bdns,   2, "bdns",   try_bdns,   [Dev, LineAbs]),
+    (Bdnsal, 2, "bdnsal", try_bdnsal, [Dev, LineAbs]),
+    (Bdse,   2, "bdse",   try_bdse,   [Dev, LineAbs]),
+    (Bdseal, 2, "bdseal", try_bdseal, [Dev, LineAbs]),
+    (Brdns,  2, "brdns",  try_brdns,  [Dev, LineRel]),
+    (Brdse,  2, "brdse",  try_brdse,  [Dev, LineRel]),
+    (L,      3, "l",      try_l,      [Reg, Dev, String]),
+    (Lb,     4, "lb",     try_lb,     [Reg, Num, String, BatchMode]),
+    (Lr,     4, "lr",     try_lr,     [Reg, Dev, ReagentMode, String]),
+    (Ls,     4, "ls",     try_ls,     [Reg, Dev, Num, String]),
+    (S,      3, "s",      try_s,      [Dev, String, Num]),
+    (Sb,     3, "sb",     try_sb,     [Num, Dev, Num]),
 
     // Flow Control, Branches and Jumps
-    // (Bap
-    // (Bapal
-    // (Bapz
-    // (Bapzal
-    // (Beq
-    // (Beqal
-    // (Beqz
-    // (Beqzal
-    // (Bge
-    // (Bgeal
-    // (Bgez
-    // (Bgezal
-    // (Bgt
-    // (Bgtal
-    // (Bgtz
-    // (Bgtzal
-    // (Ble
-    // (Bleal
-    // (Blez
-    // (Blezal
-    // (Blt
-    // (Bltal
-    // (Bltz
-    // (Bltzal
-    // (Bna
-    // (Bnaal
-    // (Bnaz
-    // (Bnazal
-    // (Bne
-    // (Bneal
-    // (Bnez
-    // (Bnezal
+    (Bap,    4, "bap",    try_bap,    [Num, Num, Num, LineAbs]),
+    (Bapal,  4, "bapal",  try_bapal,  [Num, Num, Num, LineAbs]),
+    (Bapz,   3, "bapz",   try_bapz,   [Num, Num, LineAbs]),
+    (Bapzal, 3, "bapzal", try_bapzal, [Num, Num, LineAbs]),
+    (Beq,    3, "beq",    try_beq,    [Num, Num, LineAbs]),
+    (Beqal,  3, "beqal",  try_beqal,  [Num, Num, LineAbs]),
+    (Beqz,   2, "beqz",   try_beqz,   [Num, LineAbs]),
+    (Beqzal, 2, "beqzal", try_beqzal, [Num, LineAbs]),
+    (Bge,    3, "bge",    try_bge,    [Num, Num, LineAbs]),
+    (Bgeal,  3, "bgeal",  try_bgeal,  [Num, Num, LineAbs]),
+    (Bgez,   2, "bgez",   try_bgez,   [Num, LineAbs]),
+    (Bgezal, 2, "bgezal", try_bgezal, [Num, LineAbs]),
+    (Bgt,    3, "bgt",    try_bgt,    [Num, Num, LineAbs]),
+    (Bgtal,  3, "bgtal",  try_bgtal,  [Num, Num, LineAbs]),
+    (Bgtz,   2, "bgtz",   try_bgtz,   [Num, LineAbs]),
+    (Bgtzal, 2, "bgtzal", try_bgtzal, [Num, LineAbs]),
+    (Ble,    3, "ble",    try_ble,    [Num, Num, LineAbs]),
+    (Bleal,  3, "bleal",  try_bleal,  [Num, Num, LineAbs]),
+    (Blez,   2, "blez",   try_blez,   [Num, LineAbs]),
+    (Blezal, 2, "blezal", try_blezal, [Num, LineAbs]),
+    (Blt,    3, "blt",    try_blt,    [Num, Num, LineAbs]),
+    (Bltal,  3, "bltal",  try_bltal,  [Num, Num, LineAbs]),
+    (Bltz,   2, "bltz",   try_bltz,   [Num, LineAbs]),
+    (Bltzal, 2, "bltzal", try_bltzal, [Num, LineAbs]),
+    (Bna,    4, "bna",    try_bna,    [Num, Num, Num, LineAbs]),
+    (Bnaal,  4, "bnaal",  try_bnaal,  [Num, Num, Num, LineAbs]),
+    (Bnaz,   3, "bnaz",   try_bnaz,   [Num, Num, LineAbs]),
+    (Bnazal, 3, "bnazal", try_bnazal, [Num, Num, LineAbs]),
+    (Bne,    3, "bne",    try_bne,    [Num, Num, LineAbs]),
+    (Bneal,  3, "bneal",  try_bneal,  [Num, Num, LineAbs]),
+    (Bnez,   2, "bnez",   try_bnez,   [Num, LineAbs]),
+    (Bnezal, 2, "bnezal", try_bnezal, [Num, LineAbs]),
 
-    // (Brap
-    // (Brapz
-    // (Breq,   3, "breq",   try_breq,   [(UnitNum, a), (UnitNum, b), (UnitLine, l)]),
-    // (Breqz,  2, "breqz",  try_breqz,  [(UnitNum, a), (UnitLine, l)]),
-    // (Brge,   3, "brge",   try_brge,   [(UnitNum, a), (UnitNum, b), (UnitLine, l)]),
-    // (Brgez,  2, "brgez",  try_brgez,  [(UnitNum, a), (UnitLine, l)]),
-    // (Brgt,   3, "brgt",   try_brgt,   [(UnitNum, a), (UnitNum, b), (UnitLine, l)]),
-    // (Brgtz,  2, "brgtz",  try_brgtz,  [(UnitNum, a), (UnitLine, l)]),
-    // (Brle,   3, "brle",   try_brle,   [(UnitNum, a), (UnitNum, b), (UnitLine, l)]),
-    // (Brlez,  2, "brlez",  try_brlez,  [(UnitNum, a), (UnitLine, l)]),
-    // (Brlt,   3, "brlt",   try_brlt,   [(Num, Arg::Num), (Num, Arg::Num), (LineNum, Arg::Num)]),
-    // (Brltz,  2, "brltz",  try_brltz,  [(UnitNum, a), (UnitLine, l)]),
-    // (Brna
-    // (Brnaz
-    // (Brne,   3, "brne",   try_brne,   [(UnitNum, a), (UnitNum, b), (UnitLine, l)]),
-    // (Brnez,  2, "brnez",  try_brnez,  [(UnitNum, a), (UnitLine, l)]),
-    (J,      1, "j",      try_j,      [(LineAbs, Arg::LineAbs)]),
-    // (Jal,    1, "jal",    try_jal,    [(UnitLine, l)]),
-    (Jr,     1, "jr",     try_jr,     [(LineRel, Arg::LineRel)]),
+    (Brap,   4, "brap",   try_brap,   [Num, Num, Num, LineRel]),
+    (Brapz,  3, "brapz",  try_brapz,  [Num, Num, LineRel]),
+    (Breq,   3, "breq",   try_breq,   [Num, Num, LineRel]),
+    (Breqz,  2, "breqz",  try_breqz,  [Num, LineRel]),
+    (Brge,   3, "brge",   try_brge,   [Num, Num, LineRel]),
+    (Brgez,  2, "brgez",  try_brgez,  [Num, LineRel]),
+    (Brgt,   3, "brgt",   try_brgt,   [Num, Num, LineRel]),
+    (Brgtz,  2, "brgtz",  try_brgtz,  [Num, LineRel]),
+    (Brle,   3, "brle",   try_brle,   [Num, Num, LineRel]),
+    (Brlez,  2, "brlez",  try_brlez,  [Num, LineRel]),
+    (Brlt,   3, "brlt",   try_brlt,   [Num, Num, LineRel]),
+    (Brltz,  2, "brltz",  try_brltz,  [Num, LineRel]),
+    (Brna,   4, "brna",   try_brna,   [Num, Num, Num, LineRel]),
+    (Brnaz,  3, "brnaz",  try_brnaz,  [Num, Num, LineRel]),
+    (Brne,   3, "brne",   try_brne,   [Num, Num, LineRel]),
+    (Brnez,  2, "brnez",  try_brnez,  [Num, LineRel]),
+    (J,      1, "j",      try_j,      [LineAbs]),
+    (Jal,    1, "jal",    try_jal,    [LineAbs]),
+    (Jr,     1, "jr",     try_jr,     [LineRel]),
 
     // Variable Selection
-    // (Sap
-    // (Sapz
-    // (Sdns,   2, "sdns",   try_sdns,   [(UnitVar, r), (UnitDev, d)]),
-    // (Sdse,   2, "sdse",   try_sdse,   [(UnitVar, r), (UnitDev, d)]),
-    // (Select
-    // (Seq,    3, "seq",    try_seq,    [(UnitVar, r), (UnitNum, a), (UnitNum, b)]),
-    // (Seqz,   2, "seqz",   try_seqz,   [(UnitVar, r), (UnitNum, a)]),
-    // (Sge,    3, "sge",    try_sge,    [(UnitVar, r), (UnitNum, a), (UnitNum, b)]),
-    // (Sgez,   2, "sgez",   try_sgez,   [(UnitVar, r), (UnitNum, a)]),
-    // (Sgt,    3, "sgt",    try_sgt,    [(UnitVar, r), (UnitNum, a), (UnitNum, b)]),
-    // (Sgtz,   2, "sgtz",   try_sgtz,   [(UnitVar, r), (UnitNum, a)]),
-    // (Sle,    3, "sle",    try_sle,    [(UnitVar, r), (UnitNum, a), (UnitNum, b)]),
-    // (Slez,   2, "slez",   try_slez,   [(UnitVar, r), (UnitNum, a)]),
-    // (Slt,    3, "slt",    try_slt,    [(UnitVar, r), (UnitNum, a), (UnitNum, b)]),
-    // (Sltz,   2, "sltz",   try_sltz,   [(UnitVar, r), (UnitNum, a)]),
-    // (Sna
-    // (Snaz
-    // (Sne,    3, "sne",    try_sne,    [(UnitVar, r), (UnitNum, a), (UnitNum, b)]),
-    // (Snez,   2, "snez",   try_snez,   [(UnitVar, r), (UnitNum, a)]),
+    (Sap,    4, "sap",    try_sap,    [Reg, Num, Num, Num]),
+    (Sapz,   3, "sapz",   try_sapz,   [Reg, Num, Num]),
+    (Sdns,   2, "sdns",   try_sdns,   [Reg, Dev]),
+    (Sdse,   2, "sdse",   try_sdse,   [Reg, Dev]),
+    (Select, 4, "select", try_select, [Reg, Num, Num, Num]),
+    (Seq,    3, "seq",    try_seq,    [Reg, Num, Num]),
+    (Seqz,   2, "seqz",   try_seqz,   [Reg, Num]),
+    (Sge,    3, "sge",    try_sge,    [Reg, Num, Num]),
+    (Sgez,   2, "sgez",   try_sgez,   [Reg, Num]),
+    (Sgt,    3, "sgt",    try_sgt,    [Reg, Num, Num]),
+    (Sgtz,   2, "sgtz",   try_sgtz,   [Reg, Num]),
+    (Sle,    3, "sle",    try_sle,    [Reg, Num, Num]),
+    (Slez,   2, "slez",   try_slez,   [Reg, Num]),
+    (Slt,    3, "slt",    try_slt,    [Reg, Num, Num]),
+    (Sltz,   2, "sltz",   try_sltz,   [Reg, Num]),
+    (Sna,    4, "sna",    try_sna,    [Reg, Num, Num, Num]),
+    (Snaz,   3, "snaz",   try_snaz,   [Reg, Num, Num]),
+    (Sne,    3, "sne",    try_sne,    [Reg, Num, Num]),
+    (Snez,   2, "snez",   try_snez,   [Reg, Num]),
 
     // Mathematical Operations
-    // (Abs,    2, "abs",    try_abs,    [(UnitVar, r), (UnitNum, a)]),
-    // (Acos,   2, "acos",   try_acos,   [(UnitVar, r), (UnitNum, a)]),
-    (Add,    3, "add",    try_add,    [(Reg, Arg::Reg), (Num, Arg::Num), (Num, Arg::Num)]),
-    // (Asin,   2, "asin",   try_asin,   [(UnitVar, r), (UnitNum, a)]),
-    // (Atan,   2, "atan",   try_atan,   [(UnitVar, r), (UnitNum, a)]),
-    // (Ceil,   2, "ceil",   try_ceil,   [(UnitVar, r), (UnitNum, a)]),
-    // (Cos,    2, "cos",    try_cos,    [(UnitVar, r), (UnitNum, a)]),
-    (Div,    3, "div",    try_div,    [(Reg, Arg::Reg), (Num, Arg::Num), (Num, Arg::Num)]),
-    // (Exp,    2, "expr",   try_exp,    [(UnitVar, r), (UnitNum, a)]),
-    // (Floor,  2, "floor",  try_floor,  [(UnitVar, r), (UnitNum, a)]),
-    // (Log,    2, "log",    try_log,    [(UnitVar, r), (UnitNum, a)]),
-    // (Max,    3, "max",    try_max,    [(UnitVar, r), (UnitNum, a), (UnitNum, b)]),
-    // (Min,    3, "min",    try_min,    [(UnitVar, r), (UnitNum, a), (UnitNum, b)]),
-    // (Mod,    3, "mod",    try_mod,    [(UnitVar, r), (UnitNum, a), (UnitNum, b)]),
-    (Mul,    3, "mul",    try_mul,    [(Reg, Arg::Reg), (Num, Arg::Num), (Num, Arg::Num)]),
-    // (Rand,   1, "rand",   try_rand,   [(UnitVar, r)]),
-    // (Round,  2, "round",  try_round,  [(UnitVar, r), (UnitNum, a)]),
-    // (Sin,    2, "sin",    try_sin,    [(UnitVar, r), (UnitNum, a)]),
-    // (Sqrt,   2, "sqrt",   try_sqrt,   [(UnitVar, r), (UnitNum, a)]),
-    (Sub,    3, "sub",    try_sub,    [(Reg, Arg::Reg), (Num, Arg::Num), (Num, Arg::Num)]),
-    // (Tan,    2, "tan",    try_tan,    [(UnitVar, r), (UnitNum, a)]),
-    // (Trunc,  2, "trunc",  try_trunc,  [(UnitVar, r), (UnitNum, a)]),
+    (Abs,    2, "abs",    try_abs,    [Reg, Num]),
+    (Acos,   2, "acos",   try_acos,   [Reg, Num]),
+    (Add,    3, "add",    try_add,    [Reg, Num, Num]),
+    (Asin,   2, "asin",   try_asin,   [Reg, Num]),
+    (Atan,   2, "atan",   try_atan,   [Reg, Num]),
+    (Ceil,   2, "ceil",   try_ceil,   [Reg, Num]),
+    (Cos,    2, "cos",    try_cos,    [Reg, Num]),
+    (Div,    3, "div",    try_div,    [Reg, Num, Num]),
+    (Exp,    2, "expr",   try_exp,    [Reg, Num]),
+    (Floor,  2, "floor",  try_floor,  [Reg, Num]),
+    (Log,    2, "log",    try_log,    [Reg, Num]),
+    (Max,    3, "max",    try_max,    [Reg, Num, Num]),
+    (Min,    3, "min",    try_min,    [Reg, Num, Num]),
+    (Mod,    3, "mod",    try_mod,    [Reg, Num, Num]),
+    (Mul,    3, "mul",    try_mul,    [Reg, Num, Num]),
+    (Rand,   1, "rand",   try_rand,   [Reg]),
+    (Round,  2, "round",  try_round,  [Reg, Num]),
+    (Sin,    2, "sin",    try_sin,    [Reg, Num]),
+    (Sqrt,   2, "sqrt",   try_sqrt,   [Reg, Num]),
+    (Sub,    3, "sub",    try_sub,    [Reg, Num, Num]),
+    (Tan,    2, "tan",    try_tan,    [Reg, Num]),
+    (Trunc,  2, "trunc",  try_trunc,  [Reg, Num]),
 
     // Logic
-    (And,    3, "and",    try_and,    [(Reg, Arg::Var), (Num, Arg::Num), (Num, Arg::Num)]),
-    (Nor,    3, "nor",    try_nor,    [(Reg, Arg::Var), (Num, Arg::Num), (Num, Arg::Num)]),
-    (Or,     3, "or",     try_or,     [(Reg, Arg::Var), (Num, Arg::Num), (Num, Arg::Num)]),
-    (Xor,    3, "xor",    try_xor,    [(Reg, Arg::Var), (Num, Arg::Num), (Num, Arg::Num)]),
+    (And,    3, "and",    try_and,    [Reg, Num, Num]),
+    (Nor,    3, "nor",    try_nor,    [Reg, Num, Num]),
+    (Or,     3, "or",     try_or,     [Reg, Num, Num]),
+    (Xor,    3, "xor",    try_xor,    [Reg, Num, Num]),
 
     // Stack
-    (Peek,   1, "peek",   try_peek,   [(Reg, Arg::Var)]),
-    (Pop,    1, "pop",    try_pop,    [(Reg, Arg::Var)]),
-    (Push,   1, "push",   try_push,   [(Reg, Arg::Var)]),
+    (Peek,   1, "peek",   try_peek,   [Reg]),
+    (Pop,    1, "pop",    try_pop,    [Reg]),
+    (Push,   1, "push",   try_push,   [Reg]),
 
     // Misc
-    (Alias,  2, "alias",  try_alias,  [(String, Arg::String), (Reg, Arg::Var)]),
-    (Define, 2, "define", try_define, [(String, Arg::String), (NumLit, Arg::Num)]),
+    (Alias,  2, "alias",  try_alias,  [String, DevOrReg]),
+    (Define, 2, "define", try_define, [String, NumLit]),
     (Hcf,    0, "hcf",    try_hcf,    []),
-    (Move,   2, "move",   try_move,   [(Reg, Arg::Var), (Num, Arg::Num)]),
-    (Sleep,  1, "sleep",  try_sleep,  [(Num, Arg::Num)]),
+    (Move,   2, "move",   try_move,   [Reg, Num]),
+    (Sleep,  1, "sleep",  try_sleep,  [Num]),
     (Yield,  0, "yield",  try_yield,  []),
 );
 
@@ -297,40 +278,32 @@ def_unit!(
  */
 
 impl Unit {
-    // pub fn alias_from(&self) -> Option<(String, Alias)> {
-    //     match self {
-    //         Unit::Alias([Arg::String(key), Arg::Reg(reg)], _) => {
-    //             let reg = Reg::new_alias(key.clone(), reg.reg_shared().clone());
-    //             let alias = Alias::Reg(reg);
-    //             Some((key.clone(), alias))
-    //         }
-    //         Unit::Define([Arg::String(key), Arg::Num(num)], _) => {
-    //             let alias = Alias::Num(num.clone());
-    //             Some((key.clone(), alias))
-    //         }
-    //         Unit::Label([Arg::String(key), Arg::LineNum(line_num)], _) => {
-    //             let alias = Alias::LineNum(line_num.clone());
-    //             Some((key.clone(), alias))
-    //         },
-    //         _ => {
-    //             if let Some(Arg::Reg(reg)) = self.iter_args().next() {
-    //                 Some((reg.to_string(), Alias::Reg(reg.clone())))
-    //             } else {
-    //                 None
-    //             }
-    //         }
-    //     }
-    // }
-
     pub fn get_arg(&self, i: usize) -> Option<&Arg> {
         self.args().get(i)
     }
 
-    // pub fn update_regs(&mut self, mips: &Mips) {
-    //     for arg in self.iter_args_mut() {
-    //         arg.update_reg(mips);
-    //     }
-    // }
+    pub fn iter_args(&self) -> impl Iterator<Item = &Arg> {
+        self.args().iter()
+    }
+
+    pub fn iter_args_mut(&mut self) -> impl Iterator<Item = &mut Arg> {
+        self.args_mut().iter_mut()
+    }
+
+    pub fn has_comment(&self) -> bool {
+        self.comment().is_some()
+    }
+
+    pub fn reduce_args(&mut self, mips: &Mips) -> MipsResult<()> {
+        for arg in self.iter_args_mut() {
+            if let Some(key) = arg.as_alias() {
+                if !mips.present_aliases.contains(key) {
+                    *arg = arg.clone().reduce(mips)?;
+                }
+            }
+        }
+        Ok(())
+    }
 }
 
 impl<'i> AstNode<'i, Rule, MipsParser, MipsError> for Unit {
@@ -353,19 +326,29 @@ impl<'i> AstNode<'i, Rule, MipsParser, MipsError> for Unit {
             }
         }
 
-
         if let Some(unit_pair) = unit_pair_opt {
             match unit_pair.as_rule() {
-                Rule::label => {
-                    let label = unit_pair.as_str().to_string();
-                    Ok(Self::Label([label.into()], comment_pair_opt))
-                },
+                Rule::tag => {
+                    let tag = unit_pair.as_str().to_string();
+                    Ok(Self::Tag([tag.into()], comment_pair_opt))
+                }
                 Rule::stmt => {
                     let mut pairs = unit_pair.into_inner();
                     let instr_pair = pairs.next_pair()?;
                     let arg_pairs = pairs.collect();
-                    Self::try_from_name(instr_pair.as_str(), arg_pairs, comment_pair_opt)
-                },
+                    let mut unit =
+                        Self::try_from_name(instr_pair.as_str(), arg_pairs, comment_pair_opt)?;
+                    if let Unit::Alias(
+                        [_, Arg::Reg(Reg::Base(RegBase::Lit(RegLit { fixed, .. })))],
+                        Some(comment),
+                    ) = &mut unit
+                    {
+                        if comment.find("FIX").is_some() {
+                            *fixed = true;
+                        }
+                    };
+                    Ok(unit)
+                }
                 _ => unreachable!("{:?}", unit_pair),
             }
         } else {
@@ -373,23 +356,3 @@ impl<'i> AstNode<'i, Rule, MipsParser, MipsError> for Unit {
         }
     }
 }
-
-// pub struct RegDev;
-
-// impl<'i> MipsNode<'i, Rule, MipsParser> for RegDev {
-//     type Output = Arg;
-
-//     const RULE: Rule = Rule::arg;
-
-//     fn try_from_pair(mips: &mut Mips, pair: Pair) -> MipsResult<Self::Output> {
-//         match pair.as_rule() {
-//             Rule::dev => {
-//             },
-//             Rule::var => {
-//             },
-//             Rule::reg => {
-//             },
-//             _ => panic!(),
-//         }
-//     }
-// }

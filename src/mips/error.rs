@@ -5,6 +5,7 @@ use std::{fmt, fmt::Display};
 use pest::iterators::Pair;
 
 use crate::ast_traits::{AstError, AstErrorBase};
+use crate::mips::ast::Arg;
 use crate::mips::{Alias, Rule};
 
 type PegError = pest::error::Error<Rule>;
@@ -34,7 +35,7 @@ pub enum MipsError {
 // }
 
 impl MipsError {
-    pub fn alias_undefine(key: &str) -> Self {
+    pub fn alias_undefined(key: &str) -> Self {
         Self::AliasUndefined(format!("Alias {} undefined", key))
     }
 

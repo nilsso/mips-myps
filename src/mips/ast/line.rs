@@ -1,13 +1,28 @@
 use std::{fmt, fmt::Display};
 
 use crate::ast_traits::{AstNode, AstPair, IntoAst};
-use crate::mips::ast::{Reg, Num};
-use crate::mips::{MipsError, MipsParser, MipsResult, Pair, Rule};
+use crate::mips::ast::{Reg, RegBase, Num, MipsNode};
+use crate::mips::{Mips, MipsError, MipsParser, MipsResult, Pair, Rule};
 
 #[derive(Clone, Debug)]
-pub enum LineAbs {
-    Lit(usize),
-    Alias(String),
+pub struct LineAbs(pub(crate) Num);
+
+impl MipsNode for LineAbs {
+    fn as_reg_base(&self) -> Option<RegBase> {
+        self.0.as_reg_base()
+    }
+
+    fn as_reg_base_mut(&mut self) -> Option<&mut RegBase> {
+        self.0.as_reg_base_mut()
+    }
+
+    fn as_alias(&self) -> Option<&String> {
+        self.0.as_alias()
+    }
+
+    fn reduce(self, mips: &Mips) -> MipsResult<Self> {
+        Ok(Self(self.0.reduce(mips)?))
+    }
 }
 
 impl<'i> AstNode<'i, Rule, MipsParser, MipsError> for LineAbs {
@@ -16,27 +31,36 @@ impl<'i> AstNode<'i, Rule, MipsParser, MipsError> for LineAbs {
     const RULE: Rule = Rule::arg;
 
     fn try_from_pair(pair: Pair) -> MipsResult<Self> {
-        match pair.as_rule() {
-            Rule::num => Ok(LineAbs::Lit(pair.as_str().parse()?)),
-            Rule::alias => Ok(LineAbs::Alias(pair.as_str().to_owned())),
-            _ => Err(MipsError::arg_wrong_kind("an absolute line number alias (or label)", pair))
-        }
+        let num = pair.try_into_ast();
+        num.map(LineAbs)
     }
 }
 
 impl Display for LineAbs {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            Self::Lit(t) => write!(f, "{}", t),
-            Self::Alias(t) => write!(f, "{}", t),
-        }
+        write!(f, "{}", self.0)
     }
 }
 
 #[derive(Clone, Debug)]
-pub enum LineRel {
-    Lit(isize),
-    Alias(String),
+pub struct LineRel(pub(crate) Num);
+
+impl MipsNode for LineRel {
+    fn as_reg_base(&self) -> Option<RegBase> {
+        self.0.as_reg_base()
+    }
+
+    fn as_reg_base_mut(&mut self) -> Option<&mut RegBase> {
+        self.0.as_reg_base_mut()
+    }
+
+    fn as_alias(&self) -> Option<&String> {
+        self.0.as_alias()
+    }
+
+    fn reduce(self, mips: &Mips) -> MipsResult<Self> {
+        Ok(Self(self.0.reduce(mips)?))
+    }
 }
 
 impl<'i> AstNode<'i, Rule, MipsParser, MipsError> for LineRel {
@@ -45,19 +69,13 @@ impl<'i> AstNode<'i, Rule, MipsParser, MipsError> for LineRel {
     const RULE: Rule = Rule::arg;
 
     fn try_from_pair(pair: Pair) -> MipsResult<Self> {
-        match pair.as_rule() {
-            Rule::num => Ok(Self::Lit(pair.as_str().parse()?)),
-            Rule::alias => Ok(Self::Alias(pair.as_str().to_owned())),
-            _ => Err(MipsError::arg_wrong_kind("a relative line number or alias", pair)),
-        }
+        let num = pair.try_into_ast();
+        num.map(LineRel)
     }
 }
 
 impl Display for LineRel {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            Self::Lit(t) => write!(f, "{}", t),
-            Self::Alias(t) => write!(f, "{}", t),
-        }
+        write!(f, "{}", self.0)
     }
 }
