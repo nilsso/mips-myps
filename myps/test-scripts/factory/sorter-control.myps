@@ -1,0 +1,22 @@
+main:
+    yield
+    selfReq = selfMem.Setting
+
+    # Sort
+    hash = sorter(0).OccupantHash
+    if !hash:
+        j main
+    else:
+        fix x = 1
+        beq hash -404336834 extractBit # copper
+        x *= 2
+        beq hash 226410516 extractBit # gold
+        output = 1 # left
+        j setOutput
+
+    extractBit:
+        output = (0 == trunc(selfReq / x) % 2)
+
+    setOutput:
+        sorter.Output = output
+

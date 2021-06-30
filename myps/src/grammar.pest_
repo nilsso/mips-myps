@@ -1,0 +1,69 @@
+
+int = @{ ("+" | "-")? ~ ASCII_DIGIT+ }
+num = @{ int_part ~ ("." ~ dec_part)? ~ ((^"e" | ^"E") ~ exp_part)? }
+    int_part = @{ int }
+    dec_part = @{ ASCII_DIGIT+ }
+    exp_part = @{ int }
+
+token = @{ (ASCII_ALPHA | "_") ~ (ASCII_ALPHANUMERIC | "_")* }
+
+var = { token }
+
+rv_num = { rv_param | rv_func | num }
+
+rv_func = { token ~ "(" ~ expr? ~ (expr ~ ",")* ~ ")" }
+
+rv = { rv_func | rv_param | dev_lit | num_lit | "(" ~ expr ~ ")" | var }
+    rv_param = _{ rv_net_param | rv_dev_param | rv_dev_slot }
+        rv_net_param = ${ int ~ "." ~ batch_mode ~ "." ~ param }
+        rv_dev_param = ${ dev ~ "." ~ param }
+        rv_dev_slot  = ${ dev ~ "(" ~ int ~ ")." ~ param }
+
+op_u = _{ op_u_inv | op_u_neg }
+        op_u_inv = { "-" }
+        op_u_neg = { "!" }
+op_b = _{ op_b_numerical | op_b_logical | op_b_relational }
+    op_b_numerical  = _{ op_b_add | op_b_sub | op_b_mul | op_b_div | op_b_rem }
+        op_b_add = { "+" }
+        op_b_sub = { "-" }
+        op_b_mul = { "*" }
+        op_b_div = { "/" }
+        op_b_rem = { "%" }
+    op_b_logical    = _{ op_b_and | op_b_or | op_b_xor }
+        op_b_and = { "and" }
+        op_b_or  = { "or" }
+        op_b_xor = { "xor" }
+    op_b_relational = _{ op_b_eq | op_b_ge | op_b_gt | op_b_le | op_b_lt | op_b_ne }
+        op_b_eq = { "==" }
+        op_b_ge = { ">=" }
+        op_b_gt = { ">" }
+        op_b_le = { "<=" }
+        op_b_lt = { "<" }
+        op_b_ne = { "!=" }
+op_a = _{ op_a_add | op_a_sub | op_a_mul | op_a_div | op_a_rem }
+        op_a_add = { "+=" }
+        op_a_sub = { "-=" }
+        op_a_mul = { "*=" }
+        op_a_div = { "/=" }
+        op_a_rem = { "%=" }
+
+expr = _{ expr_binary | rv | expr_ternary | expr_unary }
+    expr_unary   = { op_u ~ rv }
+    expr_binary  = { rv ~ (op_b ~ rv)+ }
+    expr_ternary = { rv ~ "?" ~ rv ~ ":" ~ rv }
+
+line = ${ SOI ~ indent* ~ unit? ~ WHITESPACE* ~ comment? ~ EOI }
+    unit = { branch | stmt }
+        branch = !{ ( b_loop | b_if | b_elif | b_else | b_while | b_for  | b_def ) ~ ":" }
+            b_loop  = { "loop" }
+            b_if    = { "if" ~ expr }
+            b_elif  = { "elif" ~ expr }
+            b_else  = { "else" }
+            b_while = { "while" ~ expr }
+            b_for   = { "for" ~ var ~ "in" ~ "(" ~ expr ~ ":" ~ expr ~ (":" ~ expr)? ~ ")" }
+            b_def   = { "def" ~ var }
+
+
+comment = @{ "#" ~ (!NEWLINE ~ ANY)* }
+WHITESPACE = _{ " " }
+

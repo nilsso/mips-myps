@@ -1,17 +1,6 @@
-[package]
-name = "mips-myps"
-version = "0.1.0"
-edition = "2018"
-
 [workspace]
 members = [
+    "./ast-traits",
     "./mips",
+    "./myps",
 ]
-
-[dependencies]
-itertools = "*"
-pest = "*"
-pest_derive = "*"
-serde = "*"
-ron = "*"
-

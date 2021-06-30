@@ -1,0 +1,56 @@
+
+int = @{ ("+" | "-")? ~ ASCII_DIGIT+ }
+num = @{ int_part ~ ("." ~ dec_part)? ~ ((^"e" | ^"E") ~ exp_part)? }
+    int_part = @{ int }
+    dec_part = @{ ASCII_DIGIT+ }
+    exp_part = @{ int }
+
+token = @{ (ASCII_ALPHA | "_") ~ (ASCII_ALPHANUMERIC | "_")* }
+
+var = { var_fixed | var_unfixed }
+    var_fixed = { "fix" ~ token }
+    var_unfixed = { token }
+    
+
+rv = { num | var }
+
+expr = _{ expr_binary | rv | expr_ternary | expr_unary }
+    expr_unary   = { op_u ~ rv }
+        op_u = _{ op_u_inv | op_u_not }
+                op_u_inv = { "-" }
+                op_u_not = { "!" }
+    expr_binary  = { rv ~ (op_b ~ rv)+ }
+        op_b = _{ op_b_numerical | op_b_logical | op_b_relational }
+            op_b_numerical = _{ op_b_add | op_b_sub | op_b_mul | op_b_div | op_b_rem }
+                op_b_add = { "+" }
+                op_b_sub = { "-" }
+                op_b_mul = { "*" }
+                op_b_div = { "/" }
+                op_b_rem = { "%" }
+        op_b_logical = _{ op_b_and | op_b_or | op_b_xor }
+                op_b_and = { "and" }
+                op_b_or  = { "or" }
+                op_b_xor = { "xor" }
+        op_b_relational = _{ op_b_eq | op_b_ge | op_b_gt | op_b_le | op_b_lt | op_b_ne }
+                op_b_eq = { "==" }
+                op_b_ge = { ">=" }
+                op_b_gt = { ">" }
+                op_b_le = { "<=" }
+                op_b_lt = { "<" }
+                op_b_ne = { "!=" }
+    expr_ternary = { rv ~ "?" ~ rv ~ ":" ~ rv }
+
+lv = { var }
+
+line = ${ SOI ~ indent ~ unit ~ WHITESPACE* ~ comment ~ EOI }
+    indent = @{ WHITESPACE* }
+    unit = !{ branch | stmt | empty }
+        branch = { (branch_loop) ~ ":" }
+            branch_loop = { "loop" }
+        stmt = { stmt_lvrv_asn }
+            stmt_lvrv_asn = { (lv ~ ",")* ~ lv ~ "=" ~ (expr ~ ",")* ~ expr }
+
+comment = @{ ("#" ~ (!NEWLINE ~ ANY)*)? }
+empty = @{ "" }
+WHITESPACE = _{ " " }
+
