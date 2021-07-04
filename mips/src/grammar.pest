@@ -5,8 +5,9 @@ num = @{ int_part ~ ("." ~ dec_part)? ~ ((^"e" | ^"E") ~ exp_part)? }
     dec_part = @{ ASCII_DIGIT+ }
     exp_part = @{ int }
 
-line = ${ SOI ~ unit? ~ ws* ~ comment? ~ EOI }
-    unit = { (tag ~ ":") | (ws* ~ stmt) }
+line = ${ SOI ~ item ~ ws* ~ comment? ~ EOI }
+    item = _{ (tag ~ ":") | (ws* ~ stmt) | empty }
+        empty = { "" }
         tag = @{ ASCII_ALPHA+ }
         stmt = { instr ~ (ws+ ~ arg)* }
             instr = @{ ASCII_ALPHA+ }
@@ -18,3 +19,6 @@ line = ${ SOI ~ unit? ~ ws* ~ comment? ~ EOI }
 
 comment = @{ "#" ~ (!NEWLINE ~ ANY)* }
 ws = _{ " " }
+
+batch_mode = { "" }
+reagent_mode =  { "" }

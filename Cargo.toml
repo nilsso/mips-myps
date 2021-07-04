@@ -1,6 +1,8 @@
 [workspace]
 members = [
     "./ast-traits",
+    # "./ast-common",
     "./mips",
     "./myps",
+    "./translator",
 ]

@@ -2,32 +2,29 @@ use std::{fmt, fmt::Display};
 
 use itertools::join;
 
-use ast_traits::{AstNode, AstPair, AstPairs};
-use crate::ast::{
-    Arg, BatchMode, Dev, DevOrReg, LineAbs, LineRel, MipsNode, Num, NumLit, ReagentMode, Reg,
-    RegBase, RegLit,
-};
+use ast_traits::{AstNode, AstPairs};
+
+use crate::ast::{Arg, Dev, DevOrReg, LineAbs, LineRel, MipsNode, Num, NumLit, Reg, RegBase};
 use crate::{Mips, MipsError, MipsParser, MipsResult, Pair, Rule};
 
-macro_rules! def_unit {
+macro_rules! def_stmt {
     ($(
         ($kind:ident, $n_args:literal, $disp:literal, $try:ident, [$($ast_kind:ty),*$(,)*])
     ),*$(,)*) => {
         #[derive(Clone, Debug)]
-        pub enum Unit {
+        pub enum Stmt {
             $(
-                $kind([Arg; $n_args], Option<String>),
+                $kind([Arg; $n_args]),
             )*
-            Tag([Arg; 1], Option<String>),
-            Empty([Arg; 0], Option<String>),
+            Tag([Arg; 1]),
+            Empty([Arg; 0]),
         }
 
-        impl Unit {
+        impl<'i> Stmt {
             $(
                 #[allow(unused_variables, unused_mut)]
                 pub fn $try(
-                    arg_pairs: Vec<Pair>,
-                    comment_opt: Option<String>
+                    arg_pairs: Vec<Pair<'i>>,
                 ) -> MipsResult<Self> {
                     let n_args = arg_pairs.len();
                     if n_args != $n_args {
@@ -37,98 +34,77 @@ macro_rules! def_unit {
                     let args: [Arg; $n_args] = [
                         $({
                             let pair = iter.next().unwrap();
-                            let ast = <$ast_kind>::try_from_pair(pair)?;
+                            let ast = <$ast_kind as AstNode<'i, Rule, MipsParser, MipsError>>::try_from_pair(pair)?;
                             ast.into()
                         }),*
                     ];
-                    let unit = Unit::$kind(args, comment_opt);
-                    Ok(unit)
+                    let stmt = Stmt::$kind(args);
+                    Ok(stmt)
                 }
             )*
 
             pub fn try_from_name(
                 instr: &str,
                 args: Vec<Pair>,
-                comment_opt: Option<String>
             ) -> MipsResult<Self> {
                 match instr {
                     $(
-                        $disp => Self::$try(args, comment_opt),
+                        $disp => Self::$try(args),
                     )*
                     _ => Err(MipsError::instr_unknown(instr)),
                 }
             }
 
+            // pub fn try_from_name_args(
+            //     instr: &str,
+            //     args: Vec<Arg>,
+            // ) -> MipsResult<Self> {
+            //     match instr {
+            //         $(
+            //             $disp => Self::$try(args),
+            //         )*
+            //         _ => Err(MipsError::instr_unknown(instr)),
+            //     }
+            // }
+
             pub fn args(&self) -> &[Arg] {
                 match self {
                     $(
-                        Self::$kind(args, _) => args,
+                        Self::$kind(args) => args,
                     )*
-                    Self::Tag(args, _) => args,
-                    Self::Empty(args, _) => args,
+                    Self::Tag(args) => args,
+                    Self::Empty(args) => args,
                 }
             }
 
             pub fn args_mut(&mut self) -> &mut [Arg] {
                 match self {
                     $(
-                        Self::$kind(args, _) => args,
+                        Self::$kind(args) => args,
                     )*
-                    Self::Tag(args, _) => args,
-                    Self::Empty(args, _) => args,
-                }
-            }
-
-            pub fn comment(&self) -> &Option<String> {
-                match self {
-                    $(
-                        Self::$kind(_, comment_opt) => comment_opt,
-                    )*
-                    Self::Tag(_, comment_opt) => comment_opt,
-                    Self::Empty(_, comment_opt) => comment_opt,
-                }
-            }
-
-            pub fn comment_mut(&mut self) -> &mut Option<String> {
-                match self {
-                    $(
-                        Self::$kind(_, comment_opt) => comment_opt,
-                    )*
-                    Self::Tag(_, comment_opt) => comment_opt,
-                    Self::Empty(_, comment_opt) => comment_opt,
+                    Self::Tag(args) => args,
+                    Self::Empty(args) => args,
                 }
             }
         }
 
-        impl Display for Unit {
+        impl Display for Stmt {
             fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
                 match self {
                     $(
-                        Self::$kind(args, comment_opt) => {
+                        Self::$kind(args) => {
                             let args_str = || join(args.iter(), " ");
-
-                            match (args.is_empty(), comment_opt) {
-                                (false, Some(comment)) => write!(f, "{} {} {}", $disp, args_str(), comment),
-                                (false,          None) => write!(f, "{} {}", $disp, args_str()),
-                                ( true, Some(comment)) => write!(f, "{} {}", $disp, comment),
-                                ( true,          None) => write!(f, "{}", $disp),
+                            if args.is_empty() {
+                                write!(f, "{}", $disp)
+                            } else {
+                                write!(f, "{} {}", $disp, args_str())
                             }
                         },
                     )*
-                    Self::Tag([Arg::String(tag)], comment_opt) => {
-                        if let Some(comment) = comment_opt {
-                            write!(f, "{}: {}", tag, comment)
-                        } else {
-                            write!(f, "{}:", tag)
-                        }
+                    Self::Tag([Arg::String(tag)]) => {
+                        write!(f, "{}:", tag)
                     }
-                    Self::Empty(_, comment_opt) => {
-                        if let Some(comment) = comment_opt {
-                            write!(f, "{}", comment)
-                        } else {
-                            Ok(())
-                        }
-                    }
+                    Self::Empty(_) => Ok(()),
                     _ => unreachable!(),
                 }
             }
@@ -137,8 +113,8 @@ macro_rules! def_unit {
 }
 
 #[rustfmt::skip]
-def_unit!(
-        // Device IO
+def_stmt!(
+    // Device IO
     (Bdns,   2, "bdns",   try_bdns,   [Dev, LineAbs]),
     (Bdnsal, 2, "bdnsal", try_bdnsal, [Dev, LineAbs]),
     (Bdse,   2, "bdse",   try_bdse,   [Dev, LineAbs]),
@@ -146,8 +122,8 @@ def_unit!(
     (Brdns,  2, "brdns",  try_brdns,  [Dev, LineRel]),
     (Brdse,  2, "brdse",  try_brdse,  [Dev, LineRel]),
     (L,      3, "l",      try_l,      [Reg, Dev, String]),
-    (Lb,     4, "lb",     try_lb,     [Reg, Num, String, BatchMode]),
-    (Lr,     4, "lr",     try_lr,     [Reg, Dev, ReagentMode, String]),
+    (Lb,     4, "lb",     try_lb,     [Reg, Num, String, Num]),
+    (Lr,     4, "lr",     try_lr,     [Reg, Dev, Num, String]),
     (Ls,     4, "ls",     try_ls,     [Reg, Dev, Num, String]),
     (S,      3, "s",      try_s,      [Dev, String, Num]),
     (Sb,     3, "sb",     try_sb,     [Num, Dev, Num]),
@@ -277,7 +253,7 @@ def_unit!(
  * When a line is removed, need to decrement shared numbers in range
  */
 
-impl Unit {
+impl Stmt {
     pub fn get_arg(&self, i: usize) -> Option<&Arg> {
         self.args().get(i)
     }
@@ -288,10 +264,6 @@ impl Unit {
 
     pub fn iter_args_mut(&mut self) -> impl Iterator<Item = &mut Arg> {
         self.args_mut().iter_mut()
-    }
-
-    pub fn has_comment(&self) -> bool {
-        self.comment().is_some()
     }
 
     pub fn reduce_args(&mut self, mips: &Mips) -> MipsResult<()> {
@@ -306,53 +278,85 @@ impl Unit {
     }
 }
 
-impl<'i> AstNode<'i, Rule, MipsParser, MipsError> for Unit {
+impl<'i> MipsNode<'i> for Stmt {
+    fn as_reg_base(&self) -> Option<RegBase> {
+        None
+    }
+
+    fn as_reg_base_mut(&mut self) -> Option<&mut RegBase> {
+        None
+    }
+
+    fn as_alias(&self) -> Option<&String> {
+        None
+    }
+
+    fn reduce(mut self, mips: &Mips) -> MipsResult<Self> {
+        for arg in self.iter_args_mut() {
+            if let Some(key) = arg.as_alias() {
+                if !mips.present_aliases.contains(key) {
+                    *arg = arg.clone().reduce(mips)?;
+                }
+            }
+        }
+        Ok(self)
+    }
+}
+
+impl<'i> AstNode<'i, Rule, MipsParser, MipsError> for Stmt {
     type Output = Self;
 
-    const RULE: Rule = Rule::line;
+    const RULE: Rule = Rule::item;
 
-    fn try_from_pair(pair: Pair) -> MipsResult<Self> {
-        let pairs = pair.into_inner();
-
-        let mut unit_pair_opt = None;
-        let mut comment_pair_opt = None;
-
-        for pair in pairs {
-            match pair.as_rule() {
-                Rule::unit => unit_pair_opt = Some(pair.only_inner()?),
-                Rule::comment => comment_pair_opt = Some(pair.as_str().into()),
-                Rule::EOI => {}
-                _ => panic!("{:?}", pair),
+    fn try_from_pair(pair: Pair) -> MipsResult<Self::Output> {
+        match pair.as_rule() {
+            Rule::empty => Ok(Self::Empty([])),
+            Rule::tag => {
+                let tag = pair.as_str().to_owned();
+                Ok(Self::Tag([tag.into()]))
             }
-        }
-
-        if let Some(unit_pair) = unit_pair_opt {
-            match unit_pair.as_rule() {
-                Rule::tag => {
-                    let tag = unit_pair.as_str().to_string();
-                    Ok(Self::Tag([tag.into()], comment_pair_opt))
-                }
-                Rule::stmt => {
-                    let mut pairs = unit_pair.into_inner();
-                    let instr_pair = pairs.next_pair()?;
-                    let arg_pairs = pairs.collect();
-                    let mut unit =
-                        Self::try_from_name(instr_pair.as_str(), arg_pairs, comment_pair_opt)?;
-                    if let Unit::Alias(
-                        [_, Arg::Reg(Reg::Base(RegBase::Lit(RegLit { fixed, .. })))],
-                        Some(comment),
-                    ) = &mut unit
-                    {
-                        if comment.find("[FIX]").is_some() {
-                            *fixed = true;
-                        }
-                    };
-                    Ok(unit)
-                }
-                _ => unreachable!("{:?}", unit_pair),
+            Rule::stmt => {
+                let mut pairs = pair.into_inner();
+                let instr = pairs.next_pair().unwrap().as_str();
+                let arg_pairs = pairs.collect();
+                Ok(Self::try_from_name(instr, arg_pairs).unwrap())
             }
-        } else {
-            Ok(Self::Empty([], comment_pair_opt))
+            _ => unreachable!("{:?}", pair),
         }
+        // let mut stmt_pair_opt = None;
+        // for pair in pairs {
+        //     match pair.as_rule() {
+        //         Rule::stmt => stmt_pair_opt = Some(pair.only_inner()?),
+        //         Rule::EOI => {}
+        //     }
+        // }
+
+        // if let Some(stmt_pair) = stmt_pair_opt {
+        //     match stmt_pair.as_rule() {
+        //         Rule::tag => {
+        //             let tag = stmt_pair.as_str().to_string();
+        //             Ok(Self::Tag([tag.into()]))
+        //         }
+        //         Rule::stmt => {
+        //             let mut pairs = stmt_pair.into_inner();
+        //             let instr_pair = pairs.next_pair()?;
+        //             let arg_pairs = pairs.collect();
+        //             let mut stmt =
+        //                 Self::try_from_name(instr_pair.as_str(), arg_pairs)?;
+        //             if let Stmt::Alias(
+        //                 [_, Arg::Reg(Reg::Base(RegBase::Lit(RegLit { fixed, .. })))],
+        //             ) = &mut stmt
+        //             {
+        //                 if comment.find("[FIX]").is_some() {
+        //                     *fixed = true;
+        //                 }
+        //             };
+        //             Ok(stmt)
+        //         }
+        //         _ => unreachable!("{:?}", stmt_pair),
+        //     }
+        // } else {
+        //     Ok(Self::Empty([], comment_pair_opt))
+        // }
     }
 }

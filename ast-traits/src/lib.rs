@@ -1,14 +1,17 @@
-#![feature(generic_associated_types)]
-#![allow(incomplete_features)]
+#![feature(bool_to_option)]
 #![allow(unused_imports)]
-use std::{fmt, fmt::Display, fmt::Debug};
 use std::fs;
 use std::io::Error as IOError;
 use std::path::Path;
+use std::{fmt, fmt::Debug, fmt::Display};
 
 use pest::error::Error as PegError;
-use pest::{Parser, RuleType};
 use pest::iterators::{Pair, Pairs};
+use pest::{Parser, RuleType};
+
+pub trait AstRule: RuleType {
+    fn eoi() -> Self;
+}
 
 #[derive(Clone, Debug)]
 pub enum AstErrorBase {
@@ -23,11 +26,7 @@ impl AstErrorBase {
         Self::PairsWrongNum(format!("Expected {} pairs, found {}", expected, found))
     }
 
-    pub fn pairs_wrong_parity(expected: &'static str, found: usize) -> Self {
-        Self::PairsWrongNum(format!("Expected {} amount of pairs, found {}", expected, found))
-    }
-
-    pub fn pair_wrong_rule<'i, R: RuleType>(expected: &'static str, found: Pair<'i, R>) -> Self {
+    pub fn pair_wrong_rule<'i, R: AstRule>(expected: &'static str, found: Pair<'i, R>) -> Self {
         Self::PairWrongRule(format!("Expected {} pair, found {:?}", expected, found))
     }
 }
@@ -43,13 +42,11 @@ impl Display for AstErrorBase {
     }
 }
 
-pub trait AstError<R: RuleType>: From<AstErrorBase> + From<PegError<R>> + From<IOError> + Debug {
+pub trait AstError<R: AstRule>:
+    From<AstErrorBase> + From<PegError<R>> + From<IOError> + Debug
+{
     fn pairs_wrong_num(e: usize, f: usize) -> Self {
         AstErrorBase::pairs_wrong_num(e, f).into()
-    }
-
-    fn pairs_wrong_parity(expected: &'static str, found: usize) -> Self {
-        AstErrorBase::pairs_wrong_parity(expected, found).into()
     }
 
     fn pair_wrong_rule<'i>(expected: &'static str, found: Pair<'i, R>) -> Self {
@@ -59,11 +56,12 @@ pub trait AstError<R: RuleType>: From<AstErrorBase> + From<PegError<R>> + From<I
 
 impl<R, E> AstError<R> for E
 where
-    R: RuleType,
+    R: AstRule,
     E: From<AstErrorBase> + From<PegError<R>> + From<IOError> + Debug,
-{}
+{
+}
 
-pub trait AstPairs<'i, R: RuleType> {
+pub trait AstPairs<'i, R: AstRule> {
     fn next_pair(&mut self) -> Result<Pair<'i, R>, AstErrorBase>;
     fn next_rule(&mut self, rule: R, rule_str: &'static str) -> Result<Pair<'i, R>, AstErrorBase>;
 
@@ -74,7 +72,7 @@ pub trait AstPairs<'i, R: RuleType> {
     fn only_rule(self, rule: R, rule_str: &'static str) -> Result<Pair<'i, R>, AstErrorBase>;
 }
 
-impl<'i, R: RuleType> AstPairs<'i, R> for Pairs<'i, R> {
+impl<'i, R: AstRule> AstPairs<'i, R> for Pairs<'i, R> {
     fn next_pair(&mut self) -> Result<Pair<'i, R>, AstErrorBase> {
         self.next().ok_or(AstErrorBase::PairsNotEnough)
     }
@@ -89,13 +87,12 @@ impl<'i, R: RuleType> AstPairs<'i, R> for Pairs<'i, R> {
     }
 
     fn final_pair(&mut self) -> Result<Pair<'i, R>, AstErrorBase> {
-        // let pair = self.next_pair()?;
         let pair = self.next_pair()?;
-        if self.next().is_none() {
-            Ok(pair)
-        } else {
-            Err(AstErrorBase::PairsTooMany)
-        }
+        self.next()
+            .map(|pair| pair.is_eoi())
+            .unwrap_or(true)
+            .then_some(pair)
+            .ok_or(AstErrorBase::PairsTooMany)
     }
 
     fn final_rule(&mut self, rule: R, rule_str: &'static str) -> Result<Pair<'i, R>, AstErrorBase> {
@@ -116,12 +113,24 @@ impl<'i, R: RuleType> AstPairs<'i, R> for Pairs<'i, R> {
     }
 }
 
-pub trait AstPair<'i, R: RuleType> {
+pub trait AstPair<'i, R: AstRule> {
+    fn is_eoi(&self) -> bool;
+
+    fn first_inner(self) -> Result<Pair<'i, R>, AstErrorBase>;
+
     fn only_inner(self) -> Result<Pair<'i, R>, AstErrorBase>;
     fn only_rule(self, rule: R, rule_str: &'static str) -> Result<Pair<'i, R>, AstErrorBase>;
 }
 
-impl<'i, R: RuleType> AstPair<'i, R> for Pair<'i, R> {
+impl<'i, R: AstRule> AstPair<'i, R> for Pair<'i, R> {
+    fn is_eoi(&self) -> bool {
+        self.as_rule() == R::eoi()
+    }
+
+    fn first_inner(self) -> Result<Pair<'i, R>, AstErrorBase> {
+        self.into_inner().next_pair()
+    }
+
     fn only_inner(self) -> Result<Pair<'i, R>, AstErrorBase> {
         self.into_inner().final_pair()
     }
@@ -136,13 +145,12 @@ impl<'i, R: RuleType> AstPair<'i, R> for Pair<'i, R> {
     }
 }
 
-
 /// Abstract syntax tree conversion traits.
 ///
 /// Provided an implementation of [`try_from_pair`](`AstNode::try_from_pair`),
 /// provides additional conversion functions from `&str` and `&Path` as well as
 /// error-less but panicking versions.
-pub trait AstNode<'i, R: RuleType, P: Parser<R>, E: AstError<R>>
+pub trait AstNode<'i, R: AstRule, P: Parser<R>, E: AstError<R>>
 where
     Self: Sized,
 {
@@ -180,24 +188,24 @@ where
 pub trait IntoAst<'i, R, P, E>
 where
     Self: Sized,
-    R: RuleType,
+    R: AstRule,
     P: Parser<R>,
     E: AstError<R>,
 {
-    fn try_into_ast<A: AstNode<'i, R, P, E, Output=A>>(self) -> Result<A, E>;
+    fn try_into_ast<A: AstNode<'i, R, P, E, Output = A>>(self) -> Result<A, E>;
 
-    fn into_ast<A: AstNode<'i, R, P, E, Output=A>>(self) -> A {
+    fn into_ast<A: AstNode<'i, R, P, E, Output = A>>(self) -> A {
         Self::try_into_ast(self).unwrap()
     }
 }
 
 impl<'i, R, P, E> IntoAst<'i, R, P, E> for Pair<'i, R>
 where
-    R: RuleType,
+    R: AstRule,
     P: Parser<R>,
     E: AstError<R>,
 {
-    fn try_into_ast<A: AstNode<'i, R, P, E, Output=A>>(self) -> Result<A, E> {
+    fn try_into_ast<A: AstNode<'i, R, P, E, Output = A>>(self) -> Result<A, E> {
         A::try_from_pair(self)
     }
 }

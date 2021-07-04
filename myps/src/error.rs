@@ -2,10 +2,12 @@ use std::io::Error as IOError;
 use std::num::{ParseFloatError, ParseIntError};
 use std::{fmt, fmt::Display};
 
-use ast_traits::AstErrorBase;
-use crate::{Rule, Pair};
-
 type PegError = pest::error::Error<Rule>;
+
+use ast_traits::AstErrorBase;
+
+use crate::ast::{Lv, Rv};
+use crate::{Pair, Rule};
 
 #[derive(Debug)]
 pub enum MypsError {
@@ -16,7 +18,47 @@ pub enum MypsError {
 
     AstErrorBase(AstErrorBase),
 
+    AliasUndefined(String),
+
+    NumFuncUnknown(String),
+
+    LvReservedName(String),
+    LvRvAsnWrongNum(String),
+    LvRvAsnWrongLvForRvDev(String),
+
     Dummy,
+}
+
+impl MypsError {
+    pub fn alias_undefined(key: &String) -> Self {
+        Self::AliasUndefined(format!("Alias '{}' undefined", key))
+    }
+
+    pub fn num_func_unknown(name: &str) -> Self {
+        Self::NumFuncUnknown(format!("Unknown function '{}'", name))
+    }
+
+    pub fn lv_reserved_name(name: String) -> Self {
+        Self::LvReservedName(format!("L-value name '{}' is reserved", name))
+    }
+
+    pub fn lv_rv_asn_wrong_num(num_lv: usize, num_expr: usize) -> Self {
+        Self::LvRvAsnWrongNum(format!(
+            "Cannot assign {} r-values to {} l-values",
+            num_expr, num_lv
+        ))
+    }
+
+    pub fn lv_rv_asn_wrong_lv_for_rv_dev(lv: &Lv, rv: &Rv) -> Self {
+        Self::LvRvAsnWrongLvForRvDev(format!(
+            concat!(
+                "A device r-value can only be assigned to a variable l-value\n",
+                "Found l-value: {:#?}\n",
+                "Found r-value: {:#?}"
+            ),
+            lv, rv
+        ))
+    }
 }
 
 impl Display for MypsError {
@@ -28,6 +70,12 @@ impl Display for MypsError {
             Self::ParseFloatError(e) => write!(f, "{:?}", e),
 
             Self::AstErrorBase(e) => write!(f, "{}", e),
+
+            Self::NumFuncUnknown(s)
+            | Self::LvReservedName(s)
+            | Self::AliasUndefined(s)
+            | Self::LvRvAsnWrongNum(s)
+            | Self::LvRvAsnWrongLvForRvDev(s) => write!(f, "{}", s),
 
             Self::Dummy => write!(f, "dummy"),
         }
@@ -54,4 +102,3 @@ impl_from_error!(
     ParseIntError,
     ParseFloatError,
 );
-

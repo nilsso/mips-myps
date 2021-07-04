@@ -1,81 +1,38 @@
 use std::{fmt, fmt::Display};
 
-use ast_traits::{AstNode, IntoAst};
-use crate::ast::{RegBase, Num, MipsNode};
-use crate::{Mips, MipsError, MipsParser, MipsResult, Pair, Rule};
+use ast_traits::{AstNode, AstPairs, IntoAst};
+
+use crate::ast::Stmt;
+use crate::{MipsError, MipsParser, MipsResult, Pair, Rule};
 
 #[derive(Clone, Debug)]
-pub struct LineAbs(pub(crate) Num);
-
-impl MipsNode for LineAbs {
-    fn as_reg_base(&self) -> Option<RegBase> {
-        self.0.as_reg_base()
-    }
-
-    fn as_reg_base_mut(&mut self) -> Option<&mut RegBase> {
-        self.0.as_reg_base_mut()
-    }
-
-    fn as_alias(&self) -> Option<&String> {
-        self.0.as_alias()
-    }
-
-    fn reduce(self, mips: &Mips) -> MipsResult<Self> {
-        Ok(Self(self.0.reduce(mips)?))
-    }
+pub struct Line {
+    pub(crate) stmt: Stmt,
+    pub(crate) comment_opt: Option<String>,
 }
 
-impl<'i> AstNode<'i, Rule, MipsParser, MipsError> for LineAbs {
+impl<'i> AstNode<'i, Rule, MipsParser, MipsError> for Line {
     type Output = Self;
 
-    const RULE: Rule = Rule::arg;
+    const RULE: Rule = Rule::line;
 
     fn try_from_pair(pair: Pair) -> MipsResult<Self> {
-        let num = pair.try_into_ast();
-        num.map(LineAbs)
+        let mut pairs = pair.into_inner();
+        let stmt = pairs.next_pair().unwrap().try_into_ast().unwrap();
+        let comment_opt = pairs.next().map(|pair| pair.as_str().to_owned());
+        Ok(Self { stmt, comment_opt })
     }
 }
 
-impl Display for LineAbs {
+impl Display for Line {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", self.0)
+        let Self { stmt, comment_opt } = self;
+
+        if let Some(comment) = comment_opt {
+            write!(f, "{} {}", stmt, comment)
+        } else {
+            write!(f, "{}", stmt)
+        }
     }
 }
 
-#[derive(Clone, Debug)]
-pub struct LineRel(pub(crate) Num);
-
-impl MipsNode for LineRel {
-    fn as_reg_base(&self) -> Option<RegBase> {
-        self.0.as_reg_base()
-    }
-
-    fn as_reg_base_mut(&mut self) -> Option<&mut RegBase> {
-        self.0.as_reg_base_mut()
-    }
-
-    fn as_alias(&self) -> Option<&String> {
-        self.0.as_alias()
-    }
-
-    fn reduce(self, mips: &Mips) -> MipsResult<Self> {
-        Ok(Self(self.0.reduce(mips)?))
-    }
-}
-
-impl<'i> AstNode<'i, Rule, MipsParser, MipsError> for LineRel {
-    type Output = Self;
-
-    const RULE: Rule = Rule::arg;
-
-    fn try_from_pair(pair: Pair) -> MipsResult<Self> {
-        let num = pair.try_into_ast();
-        num.map(LineRel)
-    }
-}
-
-impl Display for LineRel {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", self.0)
-    }
-}

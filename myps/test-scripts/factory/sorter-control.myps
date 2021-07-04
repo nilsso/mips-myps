@@ -1,22 +1,91 @@
-main:
-    yield
-    selfReq = selfMem.Setting
+sorter = d0
+selfMem = d1
+downMem = d2
+upMem = db
 
-    # Sort
-    hash = sorter(0).OccupantHash
-    if !hash:
-        j main
-    else:
-        fix x = 1
-        beq hash -404336834 extractBit # copper
-        x *= 2
-        beq hash 226410516 extractBit # gold
-        output = 1 # left
-        j setOutput
+fix selfReq = 0
+fix downReq = 0
+fix upReq = 0
+fix needOr = 0
 
-    extractBit:
-        output = (0 == trunc(selfReq / x) % 2)
+tag main:
+    yield()
 
-    setOutput:
+    tag updateSelfRequest:
+        selfReqCurr = selfMem.Setting
+        if selfReqCurr != selfReq:
+            selfReq = selfReqCurr
+            needOr = 1
+
+    tag updateDownRequest:
+        if dse(downMem):
+            downReqCurr = downMem.Setting
+            if downReqCurr != downReq:
+                downReq = downReqCurr
+                needOr = 1
+        else:
+            upReq = selfReq
+            j(getOccupantBit)
+
+    tag orRequests:
+        if needOr:
+            fix orWord, selfWord, downWord = 0, selfReq, downReq
+            while selfWord > 0 or downWord > 0:
+                orWord = (2 * orWord) + (selfWord % 2 or downWord % 2)
+                selfWord = trunc(selfWord / 2)
+                downWord = trunc(downWord / 2)
+
+    tag setUpMem:
+        upMem.Setting = upReq
+    
+    tag getOccupantBit:
+        hash = sorter[0].OccupantHash
+        fix i = 1
+        beq(hash, -404336834, extractBit) # copper
+        i *= 2
+        beq(hash, 226410516, extractBit) # gold
+        i *= 2
+        beq(hash, -1301215609, extractBit) # iron
+        i *= 2
+        beq(hash, 2134647745, extractBit) # lead
+        i *= 2
+        beq(hash, -1406385572, extractBit) # nickel
+        i *= 2
+        beq(hash, -290196476, extractBit) # silicon
+        i *= 2
+        beq(hash, -929742000, extractBit) # silver
+        i *= 2
+        beq(hash, 1058547521, extractBit) # constantan
+        i *= 2
+        beq(hash, 502280180, extractBit) # electrum
+        i *= 2
+        beq(hash, -297990285, extractBit) #invar
+        i *= 2
+        beq(hash, -82508479, extractBit) # solder
+        i *= 2
+        beq(hash, -654790771, extractBit) # steel
+        i *= 2
+        beq(hash, 412924554, extractBit) # astroloy
+        i *= 2
+        beq(hash, 1579842814, extractBit) # hastelloy
+        i *= 2
+        beq(hash, -787796599, extractBit) # inconel
+        i *= 2
+        beq(hash, -1897868623, extractBit) # stellite
+        i *= 2
+        beq(hash, 156348098, extractBit) # waspaloy
+        i *= 2
+        beq(hash, 1724793494, extractBit) # ore (coal)
+        i *= 2
+        beq(hash, -983091249, extractBit) # ore (cobalt)
+        fix output = 1
+        j(sort)
+
+    tag extractBit:
+        output = trunc(selfReq / i) % 2
+    tag sort:
         sorter.Output = output
+
+    j(main)
+
 

@@ -7,15 +7,22 @@ use pest::Parser;
 use pest_derive::Parser;
 use serde::{Deserialize, Serialize};
 
-use ast_traits::{AstNode, AstPairs, IntoAst};
+use ast_traits::{AstNode, AstPairs, IntoAst, AstRule};
+// use ast_common::AstCommonRule;
 
 pub mod graph;
 use graph::Graph;
 // use crate::mips::ast::IntoMipsNode;
 
-#[derive(Parser)]
+#[derive(Parser, Clone, Debug)]
 #[grammar = "grammar.pest"]
 pub struct MipsParser;
+
+impl AstRule for Rule {
+    fn eoi() -> Self {
+        Self::EOI
+    }
+}
 
 pub type Pair<'i> = pest::iterators::Pair<'i, Rule>;
 pub type Pairs<'i> = pest::iterators::Pairs<'i, Rule>;
@@ -34,7 +41,7 @@ impl<'i> AstNode<'i, Rule, MipsParser, MipsError> for String {
 }
 
 pub mod ast;
-use ast::{Arg, Dev, DevBase, LineAbs, LineRel, MipsNode, Num, Reg, RegBase, Unit};
+use ast::{Arg, Dev, DevBase, LineAbs, LineRel, Line, MipsNode, Num, Reg, RegBase, Stmt};
 
 pub type MipsResult<T> = Result<T, MipsError>;
 
@@ -51,7 +58,7 @@ pub struct Mips {
     // pub labels: BTreeMap<String, usize>,
     pub aliases: BTreeMap<String, Alias>,
     pub present_aliases: BTreeSet<String>,
-    pub units: Vec<Unit>,
+    pub lines: Vec<Line>,
     pub next_unique_id: usize,
 }
 
@@ -61,13 +68,13 @@ impl Default for Mips {
         // let labels = BTreeMap::new();
         let aliases = BTreeMap::new();
         let present_aliases = BTreeSet::new();
-        let units = Vec::new();
+        let lines = Vec::new();
         Self {
             // registers,
             // labels,
             aliases,
             present_aliases,
-            units,
+            lines,
             next_unique_id: 0,
         }
     }
@@ -81,27 +88,31 @@ pub struct Lifetime {
 }
 
 impl Mips {
-    fn get_alias(&self, key: &str) -> MipsResult<&Alias> {
-        self.aliases.get(key).ok_or(MipsError::alias_undefined(key))
+    pub fn get_alias(&self, key: &str) -> Option<&Alias> {
+        self.aliases.get(key)
     }
 
-    fn get_only_dev_base(&self, key: &str) -> MipsResult<DevBase> {
-        let alias = self.get_alias(key)?;
+    pub fn try_alias(&self, key: &str) -> MipsResult<&Alias> {
+        self.get_alias(key).ok_or(MipsError::alias_undefined(key))
+    }
+
+    pub fn get_only_dev_base(&self, key: &str) -> MipsResult<DevBase> {
+        let alias = self.try_alias(key)?;
         match alias {
             Alias::Dev(dev_lit) => Ok(dev_lit.clone()),
             _ => Err(MipsError::alias_wrong_kind("a device", alias)),
         }
     }
 
-    fn get_reg_base(&self, key: &str) -> MipsResult<Option<RegBase>> {
-        match self.get_alias(key)? {
+    pub fn get_reg_base(&self, key: &str) -> MipsResult<Option<RegBase>> {
+        match self.try_alias(key)? {
             Alias::Reg(reg_lit) => Ok(Some(reg_lit.clone())),
             _ => Ok(None),
         }
     }
 
-    fn get_only_reg_base(&self, key: &str) -> MipsResult<RegBase> {
-        let alias = self.get_alias(key)?;
+    pub fn get_only_reg_base(&self, key: &str) -> MipsResult<RegBase> {
+        let alias = self.try_alias(key)?;
         match alias {
             Alias::Reg(reg) => Ok(reg.clone()),
             _ => Err(MipsError::alias_wrong_kind("a register", alias)),
@@ -111,7 +122,7 @@ impl Mips {
     pub fn new(source: &str) -> Result<Self, String> {
         let mut mips = Mips::default();
         mips.parse_source(source)?;
-        mips.lex_units()?;
+        mips.lex_lines()?;
         Ok(mips)
     }
 
@@ -125,39 +136,40 @@ impl Mips {
                 format!("Too many inner pairs\nLine: \"{}\"\nError: {:?}", line, err)
             })?;
 
-            let unit = line_pair.try_into_ast::<Unit>().map_err(|err| {
+            let line = line_pair.try_into_ast::<Line>().map_err(|err| {
                 format!(
                     "Instruction parsing error\nLine: \"{}\"\nError: {}",
                     line, err
                 )
             })?;
 
-            self.units.push(unit);
+            self.lines.push(line);
         }
         Ok(())
     }
 
-    fn lex_units(&mut self) -> Result<(), String> {
+    fn lex_lines(&mut self) -> Result<(), String> {
         // Line tag pass
-        for (i, unit) in self.units.iter().enumerate() {
-            if let Unit::Tag([Arg::String(tag)], _) = unit {
+        for (i, line) in self.lines.iter().enumerate() {
+            let Line { stmt, .. } = line;
+            if let Stmt::Tag([Arg::String(tag)]) = stmt {
                 self.aliases.insert(tag.clone(), Alias::Num(i as f64));
                 self.present_aliases.insert(tag.clone());
             }
         }
         // Variable pass
-        for i in 0..self.units.len() {
-            self.lex_unit(i).map_err(|err| {
-                let unit = &self.units[i];
-                format!("Lexer error on line {}\nLine: {}\nError: {}", i, unit, err)
+        for i in 0..self.lines.len() {
+            self.lex_line(i).map_err(|err| {
+                let line = &self.lines[i];
+                format!("Lexer error on line {}\nLine: {}\nError: {}", i, line, err)
             })?;
         }
         Ok(())
     }
 
-    fn lex_unit(&mut self, i: usize) -> MipsResult<()> {
+    fn lex_line(&mut self, i: usize) -> MipsResult<()> {
         // Check that aliases are present
-        for arg in self.units[i].iter_args() {
+        for arg in self.lines[i].stmt.iter_args() {
             match arg {
                 // Arg::Dev,
                 Arg::Reg(Reg::Alias(key))
@@ -172,8 +184,8 @@ impl Mips {
             }
         }
         // Insert aliases and definitions
-        match &self.units[i] {
-            Unit::Alias([Arg::String(key), Arg::Reg(reg)], _) => {
+        match &self.lines[i].stmt {
+            Stmt::Alias([Arg::String(key), Arg::Reg(reg)]) => {
                 let reg_base = match reg {
                     Reg::Base(reg_base) => reg_base.clone(),
                     Reg::Alias(key) => self.get_only_reg_base(key)?,
@@ -182,7 +194,7 @@ impl Mips {
                 self.aliases.insert(key.clone(), alias);
                 self.present_aliases.insert(key.clone());
             }
-            Unit::Alias([Arg::String(key), Arg::Dev(dev)], _) => {
+            Stmt::Alias([Arg::String(key), Arg::Dev(dev)]) => {
                 let dev_base = match dev {
                     Dev::Base(dev_base) => dev_base.clone(),
                     Dev::Alias(key) => self.get_only_dev_base(key)?,
@@ -191,7 +203,7 @@ impl Mips {
                 self.aliases.insert(key.clone(), alias);
                 self.present_aliases.insert(key.clone());
             }
-            Unit::Define([Arg::String(key), Arg::Num(Num::Lit(n))], _) => {
+            Stmt::Define([Arg::String(key), Arg::Num(Num::Lit(n))]) => {
                 let alias = Alias::Num(*n);
                 self.aliases.insert(key.clone(), alias);
                 self.present_aliases.insert(key.clone());
@@ -206,69 +218,48 @@ impl Mips {
 
         // Remove comments
         if conf.remove_comments {
-            for unit in mips.units.iter_mut() {
-                *unit.comment_mut() = None;
+            for line in mips.lines.iter_mut() {
+                line.comment_opt = None;
             }
         }
         // Remove extraneous instructions
         let mut i = 0;
-        while i < mips.units.len() {
-            let unit = &mut mips.units[i];
-            match unit {
-                Unit::Empty(..)
+        while i < mips.lines.len() {
+            let Line { stmt, comment_opt } = &mut mips.lines[i];
+            match stmt {
+                Stmt::Empty(..)
                     if (conf.remove_empty
-                        && (conf.remove_empty_comments || !unit.has_comment())) =>
+                        && (conf.remove_empty_comments || comment_opt.is_none())) =>
                 {
-                    mips.remove_unit(i);
+                    mips.remove_line(i);
                 }
-                Unit::Define([Arg::String(key), ..], ..) if conf.remove_defines => {
+                Stmt::Define([Arg::String(key), ..], ..) if conf.remove_defines => {
                     mips.present_aliases.remove(key);
-                    mips.remove_unit(i);
+                    mips.remove_line(i);
                 }
-                Unit::Alias([Arg::String(key), ..], ..) if conf.remove_aliases => {
+                Stmt::Alias([Arg::String(key), ..], ..) if conf.remove_aliases => {
                     mips.present_aliases.remove(key);
-                    mips.remove_unit(i);
+                    mips.remove_line(i);
                 }
-                Unit::Tag([Arg::String(key)], ..) if conf.remove_tags => {
+                Stmt::Tag([Arg::String(key)], ..) if conf.remove_tags => {
                     let alias = Alias::Num(i as f64);
                     mips.aliases.insert(key.clone(), alias);
                     mips.present_aliases.remove(key);
-                    mips.remove_unit(i);
+                    mips.remove_line(i);
                 }
-                // Unit::Define([Arg::String(_), ..], _) if conf.remove_defines => {
-                //     // let alias = mips.aliases[a].clone();
-                //     // mips.aliases.insert(a.clone(), alias);
-                //     mips.units.remove(i);
-                // }
                 _ => i += 1,
             }
         }
 
-        //             // Rebuild aliases
-        //             self.aliases.clear();
-        //             for (key, alias) in self.units.iter().filter_map(Unit::alias_from) {
-        //                 self.aliases.insert(key, alias);
-        //             }
-
-        //             // Re-analyze lifetimes
-        //             // for (i, unit) in self.units.iter_mut().enumerate() {
-        //             //     let mut iter = unit.iter_args_mut();
-        //             //     if let Some(arg) = iter.next() {
-        //             //         arg.update_lifetime(Some(i), Some(i));
-        //             //     }
-        //             //     while let Some(arg) = iter.next() {
-        //             //         arg.update_lifetime(None, Some(i));
-        //             //     }
-        //             // }
-
-        mips.lex_units()?;
+        // Re-lex
+        mips.lex_lines()?;
 
         // Reduce instructions
-        let mut units = mips.units.clone();
-        for unit in units.iter_mut() {
-            unit.reduce_args(&mips).ok();
+        let mut lines = mips.lines.clone();
+        for line in lines.iter_mut() {
+            line.stmt.reduce_args(&mips).ok();
         }
-        mips.units = units;
+        mips.lines = lines;
 
         if conf.optimize_registers {
             let lifetimes = self.analyze_lifetimes();
@@ -292,9 +283,6 @@ impl Mips {
                         s: j_s,
                         e: j_e,
                     } = lifetimes[j];
-                    // * a lifetime *cannot* conflict if it exists for only one unit (s == e)
-                    // * lifetimes conflict if they overlap beyond start and ends
-                    // ((i_s != i_e) && (j_s != j_e) && (i_s < j_e) && (j_s < i_e)).then_some((i, j))
                     ((i_s < j_e) && (j_s < i_e)).then_some((i, j))
                 });
             let graph = Graph::from_edges(node_iter.chain(edge_iter)).color();
@@ -306,8 +294,8 @@ impl Mips {
                     (index, color)
                 })
                 .collect::<BTreeMap<_, _>>();
-            for unit in mips.units.iter_mut() {
-                for arg in unit.iter_args_mut() {
+            for line in mips.lines.iter_mut() {
+                for arg in line.stmt.iter_args_mut() {
                     if let Some(RegBase::Lit(reg_lit)) = arg.as_reg_base_mut() {
                         if let Some(new_index) = colors.get(&reg_lit.index) {
                             reg_lit.index = *new_index;
@@ -361,14 +349,14 @@ impl Mips {
         Ok(mips)
     }
 
-    /// Remove a unit safely
+    /// Remove a line safely
     ///
-    /// Removes a unit safely by keeping in mind edge cases:
-    /// * adjusting relative branches that encompass the unit to remove
-    pub fn remove_unit(&mut self, i: usize) {
+    /// Removes a line safely by keeping in mind edge cases:
+    /// * adjusting relative branches that encompass the line to remove
+    pub fn remove_line(&mut self, i: usize) {
         // Adjust relative branches encompassing the line to remove
-        for (j, unit) in self.units.iter_mut().enumerate().filter(|&(j, _)| i != j) {
-            for arg in unit.iter_args_mut() {
+        for (j, line) in self.lines.iter_mut().enumerate().filter(|&(j, _)| i != j) {
+            for arg in line.stmt.iter_args_mut() {
                 if let Arg::LineRel(LineRel(Num::Lit(n))) = arg {
                     use std::cmp::Ordering::*;
                     let i = i as isize;
@@ -395,7 +383,7 @@ impl Mips {
                 }
             }
         }
-        self.units.remove(i);
+        self.lines.remove(i);
     }
 
     // TODO: Add way to fix certain registers
@@ -404,13 +392,15 @@ impl Mips {
     pub fn analyze_lifetimes(&self) -> Vec<Lifetime> {
         let mut res = Vec::<Lifetime>::new();
         let mut lifetimes = BTreeMap::<usize, Lifetime>::new();
-        for (i, unit) in self
-            .units
+        let mut res_lookup = BTreeMap::<usize, Vec<usize>>::new();
+
+        for (i, line) in self
+            .lines
             .iter()
             .enumerate()
-            .filter(|(_, unit)| !matches!(unit, Unit::Alias(..)))
+            .filter(|(_, line)| !matches!(line.stmt, Stmt::Alias(..)))
         {
-            for (arg, reg_lit) in unit.args().iter().filter_map(|arg| {
+            for (arg, reg_lit) in line.stmt.args().iter().filter_map(|arg| {
                 arg.get_reg_lit(self)
                     .expect(&format!("Fatal error analyzing lifetimes\nARG: {:?}", arg))
                     .map(|reg_lit| (arg, reg_lit))
@@ -419,13 +409,21 @@ impl Mips {
                 if matches!(arg, Arg::Reg(..)) {
                     // As l-value
                     let (s, e) = if reg_lit.fixed {
-                        (0, self.units.len())
+                        // (0, self.units.len())
+                        (i, i) // TODO: do something smarter
                     } else {
                         (i, i)
                     };
                     let lifetime = Lifetime { index, s, e };
                     if let Some(old_lifetime) = lifetimes.insert(index, lifetime) {
+                        // If a lifetime for this register index is being replaced...
+
+                        // Push the old lifetime to the results
+                        let id = res.len();
                         res.push(old_lifetime);
+
+                        // And add a lookup for the index to the position in results
+                        res_lookup.entry(index).or_insert(Vec::new()).push(id);
                     }
                 } else {
                     // As r-value
@@ -447,7 +445,7 @@ impl Mips {
         let lifetimes = self.analyze_lifetimes();
 
         let mut output = "LIFETIMES:\n         ".to_owned();
-        let n = self.units.len();
+        let n = self.lines.len();
         for i in 0..n {
             if i % 10 == 0 {
                 output.push_str(&format!("{:>2}", i));

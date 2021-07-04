@@ -1,56 +1,141 @@
+/* Notes:
+ *  - "Literal" used for rules which match something primitive rule but not variables,
+        or themselves define a primitive rule. Rules suffixed with "_var" are not literal
+        in this sense, as they match a non-var primitive or a primitive var. */
 
+/* int: An literal integer number. */
 int = @{ ("+" | "-")? ~ ASCII_DIGIT+ }
-num = @{ int_part ~ ("." ~ dec_part)? ~ ((^"e" | ^"E") ~ exp_part)? }
+
+/* dec: A literal floating-point number. */
+dec = @{ int_part ~ ("." ~ dec_part)? ~ ((^"e" | ^"E") ~ exp_part)? }
     int_part = @{ int }
     dec_part = @{ ASCII_DIGIT+ }
     exp_part = @{ int }
 
-token = @{ (ASCII_ALPHA | "_") ~ (ASCII_ALPHANUMERIC | "_")* }
+/* char: A literal MIPS valid ASCII character. */
+char = { ASCII_ALPHANUMERIC }
 
-var = { var_fixed | var_unfixed }
-    var_fixed = { "fix" ~ token }
-    var_unfixed = { token }
-    
+/* token: A literal MIPS valid string of ASCII characters. */
+token = @{ ASCII_ALPHA ~ char* }
 
-rv = { num | var }
+/* var: A literal MIPS valid variable token (protects device names). */
+var = { token }
 
-expr = _{ expr_binary | rv | expr_ternary | expr_unary }
-    expr_unary   = { op_u ~ rv }
-        op_u = _{ op_u_inv | op_u_not }
-                op_u_inv = { "-" }
-                op_u_not = { "!" }
-    expr_binary  = { rv ~ (op_b ~ rv)+ }
-        op_b = _{ op_b_numerical | op_b_logical | op_b_relational }
-            op_b_numerical = _{ op_b_add | op_b_sub | op_b_mul | op_b_div | op_b_rem }
-                op_b_add = { "+" }
-                op_b_sub = { "-" }
-                op_b_mul = { "*" }
-                op_b_div = { "/" }
-                op_b_rem = { "%" }
-        op_b_logical = _{ op_b_and | op_b_or | op_b_xor }
-                op_b_and = { "and" }
-                op_b_or  = { "or" }
-                op_b_xor = { "xor" }
-        op_b_relational = _{ op_b_eq | op_b_ge | op_b_gt | op_b_le | op_b_lt | op_b_ne }
-                op_b_eq = { "==" }
-                op_b_ge = { ">=" }
-                op_b_gt = { ">" }
-                op_b_le = { "<=" }
-                op_b_lt = { "<" }
-                op_b_ne = { "!=" }
-    expr_ternary = { rv ~ "?" ~ rv ~ ":" ~ rv }
+/* dev: An literal identifier for a device pin. */
+dev = { (dev_expr | dev_lit | dev_self) ~ !("." ~ "all") }
+    dev_self =  { "db" }
+    dev_lit  = ${ "d" ~ int }
+    dev_expr =  { "d(" ~ expr_var ~ ")" }
+dev_var = { dev | var }
 
-lv = { var }
+/* dev_net: An identifier for devices on a data network.
+ *      Is really just a numeric value suffixed with ".all".
+ *      The value can be a literal integer, a parenthesized expression, or a variable
+ *      (which must alias a number/register at runtime). */
+dev_net  = { (int | ("(" ~ expr_var ~ ")") | var) ~ "." ~ "all" }
 
-line = ${ SOI ~ indent ~ unit ~ WHITESPACE* ~ comment ~ EOI }
+/* num: Something to be considered as a single, literal numerical value.
+ *      Such things are:
+ *      - A literal number (integer or floating-point)
+ *      - A parenthesized expression
+ *      - A variable token
+ *      - A builtin numeric r-value function (e.g. min, pop, sos)
+ *      - The value from reading the parameter of a device
+ *      - The value from reading a slot parameter of a device
+ *      - The value from reading a reagent parameter of a device
+ *      - The value from batch-reading the parameter of devices on the data network */
+num = { num_net_param | num_dev_reagent | num_dev_slot
+      | num_dev_param | num_func | ("(" ~ expr_var ~ ")") | dec }
+    num_dev_param   = { dev_var ~ "." ~ token }
+    num_dev_slot    = { dev_var ~ "[" ~ mode ~ "]" ~ "." ~ token }
+    num_dev_reagent = { dev_var ~ "{" ~ mode ~ "}" ~ "." ~ token }
+    num_net_param   = { dev_net ~ "." ~ mode ~ "." ~ token }
+    num_func        = { token ~ "(" ~ num? ~ ("," ~ num)* ~ ")" }
+        mode = _{ int | var | ("(" ~ num ~ ")") }
+num_var = { num | var }
+
+/* operators */
+op_u = _{ op_u_inv | op_u_not }
+        op_u_inv = { "-" }
+        op_u_not = { "!" }
+op_b = _{ op_b_numerical | op_b_logical | op_b_relational }
+    op_b_numerical = _{ op_b_add | op_b_sub | op_b_mul | op_b_div | op_b_rem | op_b_pow }
+        op_b_add = { "+" }
+        op_b_sub = { "-" }
+        op_b_mul = { "*" }
+        op_b_div = { "/" }
+        op_b_rem = { "%" }
+        op_b_pow = { "^" }
+    op_b_logical = _{ op_b_and | op_b_or | op_b_xor }
+        op_b_and = { "and" }
+        op_b_or  = { "or" }
+        op_b_xor = { "xor" }
+    op_b_relational = _{ op_b_eq | op_b_ge | op_b_gt | op_b_le | op_b_lt | op_b_ne }
+        op_b_eq = { "==" }
+        op_b_ge = { ">=" }
+        op_b_gt = { ">" }
+        op_b_le = { "<=" }
+        op_b_lt = { "<" }
+        op_b_ne = { "!=" }
+op_s = _{ op_s_add | op_s_sub | op_s_mul | op_s_div | op_s_rem }
+        op_s_add = { "+=" }
+        op_s_sub = { "-=" }
+        op_s_mul = { "*=" }
+        op_s_div = { "/=" }
+        op_s_rem = { "%=" }
+
+/* expr: Something which evaluates to a number.
+ *      Either a compound expression of numbers (or other expressions)
+ *      which evaluates to a number, or just a number (literal or variable). */
+expr = !{ expr_binary | expr_ternary | num | expr_unary }
+    expr_unary = { op_u ~ (num_var) }
+    expr_binary = { num_var ~ (op_b ~ num_var)+ }
+    expr_ternary = { num_var ~ "?" ~ num_var ~ ":" ~ num_var }
+expr_var = _{ expr | var }
+
+/* rv: An r-value, i.e. a device or an expression. */
+rv = { expr | dev | var }
+
+/* lv: An l-value, i.e. somewhere to store an r-value.
+ *      A device r-value must be matched with a variable l-value (as per an alias), while an
+ *      expression r-value can be matched with a variable l-value (as per writing a number to the
+ *      register which the variable aliases), a device parameter (as per writing a number to the
+ *      parameter of a device) or a batch-device parameter (as per batch-writing a number to the
+ *      parameter of devices on the data network). */
+lv = { lv_net_param | lv_dev_param | lv_var }
+    lv_dev_param = { dev_var ~ "." ~ token }
+    lv_net_param = { dev_net ~ "." ~ token }
+    lv_var = { var_fixed | var }
+        var_fixed = { "fix" ~ var }
+
+/* line: A single valid line of code; blank, a statement, or a branch. */
+line = ${ indent ~ item ~ WHITESPACE* ~ comment }
     indent = @{ WHITESPACE* }
-    unit = !{ branch | stmt | empty }
-        branch = { (branch_loop) ~ ":" }
-            branch_loop = { "loop" }
-        stmt = { stmt_lvrv_asn }
-            stmt_lvrv_asn = { (lv ~ ",")* ~ lv ~ "=" ~ (expr ~ ",")* ~ expr }
+    item = !{ branch | stmt }
+        branch = { branches ~ ":" }
+            branches = _{ branch_loop | branch_tag | branch_if | branch_elif
+                        | branch_else | branch_while | branch_for }
+                branch_loop  = { "loop" }
+                branch_tag   = { "tag" ~ token }
+                branch_if    = { "if" ~ expr_var }
+                branch_elif  = { "elif" ~ expr_var }
+                branch_else  = { "else" }
+                branch_while = { "while" ~ expr_var }
+                branch_for   = { "for" ~ var ~ "in" ~
+                    "(" ~ expr_var ~ ":" ~ expr_var ~ (":" ~ expr_var)? ~ ")" }
+
+        stmt = { stmt_lvrv_asn | stmt_self_asn | stmt_mips | stmt_empty }
+            stmt_lvrv_asn = { lv ~ ("," ~ lv)* ~ "=" ~ rv ~ ("," ~ rv)*  }
+            stmt_self_asn = { lv ~ op_s ~ expr }
+            stmt_mips = { token ~ "(" ~ (rv ~ ",")* ~ rv? ~ ")" }
+            stmt_empty = { "" }
+
+/* single_line: Rule for parsing lines as the entire input source. */
+single_line = ${ SOI ~ line ~ EOI }
+
+/* program: Rule for parsing the source of a multi-line program. */
+program = ${ SOI ~ (line ~ NEWLINE)* ~ line? ~ EOI }
 
 comment = @{ ("#" ~ (!NEWLINE ~ ANY)*)? }
-empty = @{ "" }
 WHITESPACE = _{ " " }
 

@@ -1,33 +1,12 @@
-use crate::{Mips, MipsResult};
+pub use ast_traits::AstNode;
+use crate::{Mips, MipsResult, Rule, MipsParser, MipsError};
 
-mod dev;
-pub use dev::{DevLit, DevBase, Dev};
+// pub use ast_common::ModeRepr;
+// pub type BatchMode = ast_common::BatchMode;
+// pub type ReagentMode = ast_common::ReagentMode;
+// pub type ReagentMode<'a> = ast_common::ReagentMode<'a, Rule, MipsParser, MipsError>;
 
-mod reg;
-pub use reg::{RegLit, RegBase, Reg};
-
-mod num;
-pub use num::{Num, NumLit};
-
-// mod var;
-// pub use var::Var;
-
-mod line;
-pub use line::{LineAbs, LineRel};
-
-mod arg;
-pub use arg::{Arg, DevOrReg};
-
-mod mode;
-pub use mode::{BatchMode, ReagentMode};
-
-mod unit;
-pub use unit::Unit;
-
-pub trait MipsNode
-where
-    Self: std::fmt::Debug,
-{
+pub trait MipsNode<'i>: AstNode<'i, Rule, MipsParser, MipsError> + std::fmt::Debug {
     fn as_reg_base(&self) -> Option<RegBase>;
 
     fn as_reg_base_mut(&mut self) -> Option<&mut RegBase>;
@@ -54,3 +33,58 @@ where
         }
     }
 }
+
+// impl<'i> MipsNode<'i> for BatchMode {
+//     fn as_reg_base(&self) -> Option<RegBase> { None }
+//     fn as_reg_base_mut(&mut self) -> Option<&mut RegBase> { None }
+//     fn as_alias(&self) -> Option<&String> { None }
+//     fn reduce(self, _mips: &Mips) -> MipsResult<Self> {
+//         match self {
+//             Self::Avg(..) => Ok(Self::Avg(ModeRepr::Int)),
+//             Self::Sum(..) => Ok(Self::Sum(ModeRepr::Int)),
+//             Self::Min(..) => Ok(Self::Min(ModeRepr::Int)),
+//             Self::Max(..) => Ok(Self::Max(ModeRepr::Int)),
+//         }
+//     }
+// }
+
+// impl<'i> MipsNode<'i> for ReagentMode {
+//     fn as_reg_base(&self) -> Option<RegBase> { None }
+//     fn as_reg_base_mut(&mut self) -> Option<&mut RegBase> { None }
+//     fn as_alias(&self) -> Option<&String> { None }
+//     fn reduce(self, _mips: &Mips) -> MipsResult<Self> {
+//         #[rustfmt::skip]
+//         match self {
+//             Self::Contents(..) => Ok(Self::Contents(ModeRepr::Int)),
+//             Self::Required(..) => Ok(Self::Required(ModeRepr::Int)),
+//             Self::Recipe(..)   => Ok(Self::Recipe(ModeRepr::Int)),
+//         }
+//     }
+// }
+
+mod dev;
+pub use dev::{DevLit, DevBase, Dev};
+
+mod reg;
+pub use reg::{RegLit, RegBase, Reg};
+
+mod num;
+pub use num::{Num, NumLit};
+
+// mod var;
+// pub use var::Var;
+
+mod line_num;
+pub use line_num::{LineAbs, LineRel};
+
+mod arg;
+pub use arg::{Arg, DevOrReg};
+
+// mod mode;
+// pub use mode::{BatchMode, ReagentMode};
+
+mod stmt;
+pub use stmt::Stmt;
+
+mod line;
+pub use line::Line;

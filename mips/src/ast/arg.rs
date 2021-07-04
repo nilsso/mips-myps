@@ -2,7 +2,7 @@ use std::{fmt, fmt::Display};
 
 use ast_traits::{AstNode, IntoAst};
 use crate::ast::{
-    BatchMode, Dev, LineAbs, LineRel, MipsNode, Num, ReagentMode, Reg, RegBase,
+    Dev, LineAbs, LineRel, MipsNode, Num, Reg, RegBase,
 };
 use crate::{Mips, MipsError, MipsParser, MipsResult, Pair, Rule};
 
@@ -13,12 +13,10 @@ pub enum Arg {
     Num(Num),
     LineAbs(LineAbs),
     LineRel(LineRel),
-    BatchMode(BatchMode),
-    ReagentMode(ReagentMode),
     String(String),
 }
 
-impl MipsNode for Arg {
+impl<'i> MipsNode<'i> for Arg {
     fn as_reg_base(&self) -> Option<RegBase> {
         match self {
             Self::Dev(dev) => dev.as_reg_base(),
@@ -26,8 +24,6 @@ impl MipsNode for Arg {
             Self::Num(num) => num.as_reg_base(),
             Self::LineAbs(line_abs) => line_abs.as_reg_base(),
             Self::LineRel(line_rel) => line_rel.as_reg_base(),
-            Self::BatchMode(..) => None,
-            Self::ReagentMode(..) => None,
             Self::String(..) => None,
         }
     }
@@ -39,8 +35,6 @@ impl MipsNode for Arg {
             Self::Num(num) => num.as_reg_base_mut(),
             Self::LineAbs(line_abs) => line_abs.as_reg_base_mut(),
             Self::LineRel(line_rel) => line_rel.as_reg_base_mut(),
-            Self::BatchMode(..) => None,
-            Self::ReagentMode(..) => None,
             Self::String(..) => None,
         }
     }
@@ -52,8 +46,6 @@ impl MipsNode for Arg {
             Self::Num(num) => num.as_alias(),
             Self::LineAbs(line_abs) => line_abs.as_alias(),
             Self::LineRel(line_rel) => line_rel.as_alias(),
-            Self::BatchMode(..) => None,
-            Self::ReagentMode(..) => None,
             Self::String(..) => None,
         }
     }
@@ -65,8 +57,6 @@ impl MipsNode for Arg {
             Self::Num(num) => Ok(Self::Num(num.reduce(mips)?)),
             Self::LineAbs(line_abs) => Ok(Self::LineAbs(line_abs.reduce(mips)?)),
             Self::LineRel(line_rel) => Ok(Self::LineRel(line_rel.reduce(mips)?)),
-            Self::BatchMode(batch_mode) => Ok(Self::BatchMode(batch_mode.reduce(mips)?)),
-            Self::ReagentMode(reagent_mode) => Ok(Self::ReagentMode(reagent_mode.reduce(mips)?)),
             Self::String(..) => Ok(self),
         }
     }
@@ -106,8 +96,6 @@ impl_into_arg!(
     (Num, Arg::Num),
     (LineAbs, Arg::LineAbs),
     (LineRel, Arg::LineRel),
-    (BatchMode, Arg::BatchMode),
-    (ReagentMode, Arg::ReagentMode),
     (String, Arg::String),
 );
 
@@ -119,8 +107,6 @@ impl Display for Arg {
             Self::Num(t) => write!(f, "{}", t),
             Self::LineAbs(t) => write!(f, "{}", t),
             Self::LineRel(t) => write!(f, "{}", t),
-            Self::BatchMode(t) => write!(f, "{}", t),
-            Self::ReagentMode(t) => write!(f, "{}", t),
             Self::String(t) => write!(f, "{}", t),
         }
     }

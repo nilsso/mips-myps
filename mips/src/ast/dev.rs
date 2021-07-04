@@ -78,11 +78,11 @@ pub enum Dev {
     Alias(String),
 }
 
-impl MipsNode for Dev {
+impl<'i> MipsNode<'i> for Dev {
     fn as_reg_base(&self) -> Option<RegBase> {
         match self {
             &Self::Base(DevBase::Lit(DevLit { index, indirections })) if indirections > 0 => {
-                Some(RegBase::Lit(RegLit { index, indirections: 0, fixed: true }))
+                Some(RegBase::Lit(RegLit { index, indirections, fixed: true }))
             }
             _ => None,
         }

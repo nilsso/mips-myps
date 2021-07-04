@@ -31,29 +31,27 @@ fn main() {
         println!("{}", h);
     };
     #[allow(unused_variables)]
-    let print_units = |mips: &Mips| {
-        println!("UNITS:");
-        let w = w(mips.units.len());
-        for (i, unit) in mips.units.iter().enumerate() {
-            println!("{:>w$}: {}", i, unit, w=w);
+    let print_lines = |mips: &Mips| {
+        println!("LINES:");
+        let w = w(mips.lines.len());
+        for (i, line) in mips.lines.iter().enumerate() {
+            println!("{:>w$}: {}", i, line, w=w);
         }
     };
     #[allow(unused_variables)]
-    let print_units_debug = |mips: &Mips| {
-        println!("UNITS:");
-        let w = w(mips.units.len());
-        for (i, unit) in mips.units.iter().enumerate() {
-            println!("{:>w$}: {:?}", i, unit, w=w);
+    let print_lines_debug = |mips: &Mips| {
+        println!("LINES:");
+        let w = w(mips.lines.len());
+        for (i, line) in mips.lines.iter().enumerate() {
+            println!("{:>w$}: {:?}", i, line, w=w);
         }
     };
     #[allow(unused_variables)]
-    let print_units_both = |mips: &Mips| {
-        println!("UNITS:");
-        let w = w(mips.units.len());
-        for (i, unit) in mips.units.iter().enumerate() {
-            println!("{:>w$}:", i, w=w);
-            println!("> {}", unit);
-            println!("> {:?}", unit);
+    let print_lines_both = |mips: &Mips| {
+        println!("LINES:");
+        let w = w(mips.lines.len());
+        for (i, line) in mips.lines.iter().enumerate() {
+            println!("{:>w$}: {} {:?}", i, line, line, w=w);
         }
     };
     #[allow(unused_variables)]
@@ -73,7 +71,7 @@ fn main() {
     fn interpret(source: &str) -> Result<(Mips, Mips), String> {
         let mips = Mips::new(&source)?;
         let mut conf = OptimizationConfig::default();
-        conf.remove_comments = false;
+        // conf.remove_comments = false;
         // conf.remove_empty = false;
         // conf.remove_empty_comments = false;
         // conf.remove_aliases = false;
@@ -88,24 +86,24 @@ fn main() {
     match interpret(&source) {
         #[allow(unused_variables)]
         Ok((mips, optimized)) => {
-            print_units(&mips);
-            print_units_debug(&mips);
-            // print_units_both(&mips);
+            print_lines(&mips);
+            // print_lines_debug(&mips);
+            // print_lines_both(&mips);
             // print_registers(&mips);
             // print_aliases(&mips);
             // println!("{}", mips.interference_graph());
             // println!("{:#?}", mips.analyze_lifetimes());
 
             header("OPTIMIZED");
-            print_units(&optimized);
-            print_units_debug(&optimized);
-            // print_units_both(&mips);
+            print_lines(&optimized);
+            // print_lines_debug(&optimized);
+            // print_lines_both(&mips);
             // print_registers(&optimized);
             // print_aliases(&optimized);
             // println!("{}", optimized.interference_graph());
             // println!("{:#?}", optimized.analyze_lifetimes());
 
-            // for unit in optimized.units.iter() {
+            // for unit in optimized.lines.iter() {
             //     println!("{}", unit);
             // }
         }

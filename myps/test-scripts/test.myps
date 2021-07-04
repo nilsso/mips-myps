@@ -1,6 +1,1 @@
-a = 0
-loop:
-    b = 1
-    loop:
-        c = 2
-    d = 3
+a = trunc(2.1)

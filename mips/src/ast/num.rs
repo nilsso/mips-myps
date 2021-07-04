@@ -11,7 +11,7 @@ pub enum Num {
     Alias(String),
 }
 
-impl MipsNode for Num {
+impl<'i> MipsNode<'i> for Num {
     fn as_reg_base(&self) -> Option<RegBase> {
         match self {
             Self::Reg(reg_base) => Some(reg_base.clone()),
@@ -37,7 +37,7 @@ impl MipsNode for Num {
         match self {
             Self::Lit(..) | Self::Reg(..) => Ok(self),
             Self::Alias(key) => {
-                let alias = mips.get_alias(&key)?;
+                let alias = mips.try_alias(&key)?;
                 match alias {
                     Alias::Num(n) => Ok(Self::Lit(*n)),
                     Alias::Reg(reg_base) => Ok(Self::Reg(reg_base.clone())),

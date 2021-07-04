@@ -4,7 +4,7 @@ use crate::ast::MipsNode;
 use crate::{Mips, MipsError, MipsParser, MipsResult, Pair, Rule};
 use ast_traits::{AstNode, AstPair, IntoAst};
 
-#[derive(Clone, Debug)]
+#[derive(Copy, Clone, Debug)]
 pub struct RegLit {
     pub(crate) index: usize,
     pub(crate) indirections: usize,
@@ -41,7 +41,7 @@ impl Display for RegLit {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Copy, Clone, Debug)]
 pub enum RegBase {
     SP,
     RA,
@@ -94,7 +94,7 @@ pub enum Reg {
     Alias(String),
 }
 
-impl MipsNode for Reg {
+impl<'i> MipsNode<'i> for Reg {
     fn as_reg_base(&self) -> Option<RegBase> {
         match self {
             Self::Base(reg_base) => Some(reg_base.clone()),
