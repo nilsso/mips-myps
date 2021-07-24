@@ -349,8 +349,12 @@ impl Translator {
                 .unwrap() = c;
         }
 
-        fn tag(i: usize) -> String {
+        fn tag_string(i: usize) -> String {
             format!("endChain{}", i)
+        }
+
+        fn tag(i: usize) -> Arg {
+            Arg::LineAbs(LineAbs(tag_string(i).into()))
         }
 
         let myps::ast::Block { branch, items } = block;
@@ -407,13 +411,13 @@ impl Translator {
                 // Shift body hints
                 shift_scopes(&mut body_lines, cond_stmts.len());
                 // Push if-elif-else chain line
-                let tag = tag(chain_id).into();
+                // let tag = tag(chain_id).into();
                 let chain_stmt = if end_chain {
                     // If end of chain, add post if-elif-else chain tag
-                    Stmt::Tag([tag])
+                    Stmt::Tag([tag_string(chain_id).into()])
                 } else {
                     // Else not end of chain, add jump to post if-elif-else chain tag
-                    Stmt::J([tag])
+                    Stmt::J([tag(chain_id)])
                 };
                 body_lines.push(Line::new_no_comment(chain_stmt));
                 // Update condition branch jump
@@ -1201,7 +1205,7 @@ fn main() {
     for (i, line) in mips.lines.iter().enumerate() {
         println!("{:>w$}: {}", i, line, w = w);
     }
-    println!("{}", mips.interference_graph());
+    // println!("{}", mips.interference_graph());
     // println!("{:#?}", mips.analyze_lifetimes());
     // println!("SCOPES {:?}", mips.scopes);
 }

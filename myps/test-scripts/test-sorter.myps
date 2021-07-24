@@ -17,3 +17,23 @@ loop: # loop
             if downReqCurr != downReq: # if downReqCurr != downREq:
                 downReq = downReqCurr # downReq = downReqCurr
                 updateUpReq = 1 # updateUpReq = 1
+    # (end updateDownRequest)
+    tag orRequests: # orRequests:
+        if updateUpReq: # if updateUpReq:
+            if downReq == 0: # if downReq == 0:
+                upReq = selfReq # upReq = selfReq
+            elif selfReq == 0: # elif selfReq == 0:
+                upReq = downReq # upReq = downReq
+            else: # else:
+                fix orWord = 0 # fix orWord = 0
+                fix selfWord = selfReq # fix selfWord = selfReq
+                fix downWord = downReq # fix downWord = downReq
+                while selfWord > 0 or downWord > 0: # while selfWord > 0 or downWord > 0:
+                    orWord = (2 * orWord) + (selfWord % 2 or downWord % 2) # orWord = (2 * orWord) + (selfWord % 2 or downWord % 2)
+                    selfWord = trunc(selfWord / 2) # selfWord = trunc(selfWord / 2)
+                    downWord = trunc(downWord / 2) # downWord = trunc(downWord / 2)
+                    # (end while)
+                upReq = orWord # upReq = orWord
+            upMem.Setting = upReq # upMem.Setting = upReq
+            updateUpReq = 0 # updateUpReq = 0
+

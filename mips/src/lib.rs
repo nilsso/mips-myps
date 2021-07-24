@@ -317,6 +317,23 @@ impl Mips {
 
     pub fn optimize(&self, conf: OptimizationConfig) -> Result<Mips, String> {
         let mut mips = self.clone();
+
+        let tag_lines = mips
+            .lines
+            .iter()
+            .enumerate()
+            .filter_map(|(i, line)| {
+                if let Stmt::Tag([key]) = &line.stmt {
+                    let a = Some((key.to_string(), i));
+                    a
+                } else {
+                    None
+                }
+            })
+            .collect::<BTreeMap<String, usize>>();
+        // println!("TAGS {:#?}", tag_lines);
+        // for lines in mips.lines.
+
         if conf.optimize_registers {
             let lifetimes = mips.analyze_lifetimes();
             let n = lifetimes.len();
@@ -352,29 +369,57 @@ impl Mips {
                 }
             }
         }
-        // Remove statements (i.e. replace with Empty)
-        for (i, line) in mips.lines.iter_mut().enumerate() {
+        // Replace statements and arguments
+        for (_i, line) in mips.lines.iter_mut().enumerate() {
             match line {
                 // Replace defines
-                Line { stmt: Stmt::Define(..), comment_opt } if conf.remove_defines => {
+                Line {
+                    stmt: Stmt::Define(..),
+                    comment_opt,
+                } if conf.remove_defines => {
                     let comment_opt = comment_opt.take();
-                    *line = Line { stmt: Stmt::Empty([]), comment_opt };
+                    *line = Line {
+                        stmt: Stmt::Empty([]),
+                        comment_opt,
+                    };
                 }
                 // Replace aliases
-                Line { stmt: Stmt::Alias([_, rhs], ..), comment_opt }
-                    if matches!(rhs, Arg::Dev(..)) && conf.remove_dev_aliases
-                        || matches!(rhs, Arg::Reg(..)) && conf.remove_reg_aliases => {
+                Line {
+                    stmt: Stmt::Alias([_, rhs], ..),
+                    comment_opt,
+                } if matches!(rhs, Arg::Dev(..)) && conf.remove_dev_aliases
+                    || matches!(rhs, Arg::Reg(..)) && conf.remove_reg_aliases =>
+                {
                     let comment_opt = comment_opt.take();
-                    *line = Line { stmt: Stmt::Empty([]), comment_opt };
-                },
-                // Replace tags
-                Line { stmt: Stmt::Tag([Arg::String(key)]), comment_opt } => {
-                    let alias = Alias::Num(i as f64);
-                    mips.aliases.insert(key.clone(), alias);
-                    let comment_opt = comment_opt.take();
-                    *line = Line { stmt: Stmt::Empty([]), comment_opt };
+                    *line = Line {
+                        stmt: Stmt::Empty([]),
+                        comment_opt,
+                    };
                 }
-                _ => {},
+                // Replace tags
+                Line {
+                    stmt: Stmt::Tag(_),
+                    comment_opt,
+                } if conf.remove_tags => {
+                    let comment_opt = comment_opt.take();
+                    *line = Line {
+                        stmt: Stmt::Empty([]),
+                        comment_opt,
+                    };
+                }
+                Line { stmt, .. } => {
+                    for arg in stmt.args_mut().iter_mut().rev() {
+                        match arg {
+                            Arg::LineAbs(LineAbs(num)) if conf.remove_tags => {
+                                if let Some(key) = num.as_alias() {
+                                    let i = tag_lines.get(key).unwrap();
+                                    *num = Num::Lit(*i as f64);
+                                }
+                            }
+                            _ => {},
+                        }
+                    }
+                }
             }
         }
         // Remove comments
@@ -391,10 +436,10 @@ impl Mips {
                 match stmt {
                     Stmt::Empty(..)
                         if (conf.remove_empty
-                            && (conf.remove_empty_comments || comment_opt.is_none())) =>
+                            && (comment_opt.is_none() || conf.remove_empty_comments)) =>
                     {
                         mips.remove_line(i);
-                    },
+                    }
                     _ => i += 1,
                 }
             }
@@ -464,6 +509,14 @@ impl Mips {
                         }
                     }
                 }
+                if let Arg::LineAbs(LineAbs(Num::Lit(n))) = arg {
+                    // println!("LINE ABS i={} j={} n={}", i, j, n);
+                    if (i as f64) < *n {
+                    //     println!("DECREMENT");
+                        *n -= 1_f64;
+                    }
+                    // if i < n
+                }
                 if let Arg::LineRel(LineRel(Num::Lit(n))) = arg {
                     use std::cmp::Ordering::*;
                     let i = i as isize;
@@ -503,7 +556,7 @@ impl Mips {
     }
 
     pub fn analyze_lifetimes(&self) -> Vec<(usize, (usize, usize))> {
-        use crate::ast::{RegLit, FixMode};
+        use crate::ast::{FixMode, RegLit};
 
         let mut res = Vec::new();
         let mut lifetimes = BTreeMap::<usize, (usize, usize)>::new();
@@ -522,13 +575,16 @@ impl Mips {
         // .filter(|(_, line)| !matches!(line.stmt, Stmt::Alias(..)))
         {
             for (arg, reg_lit) in line.stmt.args().iter().rev().filter_map(|arg| {
+                // arg.as_reg_lit()
                 arg.get_reg_lit(self)
                     .expect(&format!("Fatal error analyzing lifetimes\nARG: {:?}", arg))
                     .map(|reg_lit| (arg, reg_lit))
             }) {
-                let RegLit { index, fix_mode, .. } = reg_lit;
+                let RegLit {
+                    index, fix_mode, ..
+                } = reg_lit;
                 if matches!(arg, Arg::Reg(..)) {
-                    let (lifetime, replace) = match fix_mode {
+                    let (lifetime, _replace) = match fix_mode {
                         FixMode::None => ((i, i), true),
                         FixMode::Fixed => ((0, self.lines.len() - 1), false),
                         FixMode::Scoped(s, e) => ((s, e), false),

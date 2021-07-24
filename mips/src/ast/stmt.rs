@@ -249,8 +249,8 @@ def_stmt!(
     (Brnaz,  "brnaz",  3, "num,num,num",       [N, N, LR]),
     (Brne,   "brne",   3, "num,num,num",       [N, N, LR]),
     (Brnez,  "brnez",  2, "num,num",           [N, LR]),
-    (J,      "j",      1, "num",               [LR]),
-    (Jal,    "jal",    1, "num",               [LR]),
+    (J,      "j",      1, "num",               [LA]),
+    (Jal,    "jal",    1, "num",               [LA]),
     (Jr,     "jr",     1, "num",               [LR]),
 
     // Variable Selection

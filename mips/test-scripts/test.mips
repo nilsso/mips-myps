@@ -1,8 +1,8 @@
+j ahead
 alias x r0
 alias y r1
-
 j ahead
 move x 1
-
 ahead:
 move y 2
+j ahead

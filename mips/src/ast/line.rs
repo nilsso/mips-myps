@@ -29,7 +29,9 @@ impl<'i> AstNode<'i, Rule, MipsParser, MipsError> for Line {
     fn try_from_pair(pair: Pair) -> MipsResult<Self> {
         let mut pairs = pair.into_inner();
         let stmt = pairs.next_pair().unwrap().try_into_ast().unwrap();
-        let comment_opt = pairs.next().map(|pair| pair.as_str().to_owned());
+        let comment_opt = pairs.next().and_then(|pair| {
+            matches!(pair.as_rule(), Rule::comment).then_some(pair.as_str().to_owned())
+        });
         Ok(Self { stmt, comment_opt })
     }
 }
@@ -49,4 +51,3 @@ impl Display for Line {
         }
     }
 }
-

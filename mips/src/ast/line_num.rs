@@ -23,7 +23,8 @@ impl<'i> MipsNode<'i> for LineAbs {
     }
 
     fn as_alias(&self) -> Option<&String> {
-        self.0.as_alias()
+        // self.0.as_alias()
+        None
     }
 }
 

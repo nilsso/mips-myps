@@ -22,26 +22,48 @@ fn main() {
     // println!("{:#?}", mips.lines);
 
     // println!("================================================================================");
-    // let w = (mips.lines.len() as f64 - 1.0).log10().floor().max(0_f64) as usize + 1;
-    // for (i, line) in mips.lines.iter().enumerate() {
-    //     println!("{:>w$}: {}", i, line, w = w);
-    //     // println!("{:>w$}: {:?}", i, line, w = w);
-    // }
+    let w = (mips.lines.len() as f64 - 1.0).log10().floor().max(0_f64) as usize + 1;
+    for (i, line) in mips.lines.iter().enumerate() {
+        println!("{:>w$}: {:?}", i, line, w = w);
+    }
+    println!("--------------------------------------------------------------------------------");
+    for (i, line) in mips.lines.iter().enumerate() {
+        println!("{:>w$}: {}", i, line, w = w);
+    }
 
-    // println!("================================================================================");
+    println!("================================================================================");
     let mips = mips
         .optimize(OptimizationConfig {
+            // remove_comments: true,
             remove_comments: false,
+
             remove_empty: true,
-            remove_empty_comments: true,
-            remove_reg_aliases: true,
+            // remove_empty: false,
+
+            // remove_empty_comments: true,
+            remove_empty_comments: false,
+
+            // remove_reg_aliases: true,
+            remove_reg_aliases: false,
+
+            // remove_dev_aliases: true,
             remove_dev_aliases: false,
-            remove_defines: true,
+
+            // remove_defines: true,
+            remove_defines: false,
+
             remove_tags: true,
+            // remove_tags: false,
+
             optimize_registers: true,
+            // optimize_registers: false,
         })
         .unwrap();
     let w = (mips.lines.len() as f64 - 1.0).log10().floor().max(0_f64) as usize + 1;
+    for (i, line) in mips.lines.iter().enumerate() {
+        println!("{:>w$}: {:?}", i, line, w = w);
+    }
+    println!("--------------------------------------------------------------------------------");
     for (i, line) in mips.lines.iter().enumerate() {
         println!("{:>w$}: {}", i, line, w = w);
     }

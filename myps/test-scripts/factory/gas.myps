@@ -1,19 +1,33 @@
 furnace = d0
 sourceC = d1
 sourceH = d2
+nCmem = d3
+nHmem = d4
 
 def vF = 1000
 def R = 8.314
-def tT = 1000
-def pT = 10000
+
+fix tT = 1000
+fix pT = 10000
+
+db.Setting = 0
 # Read devices
 tF = furnace.Temperature
 nF = furnace.TotalMoles
 tC = sourceC.Temperature
 tH = sourceH.Temperature
 # Calculate
-nT = (pT * vF) / (R * tT) # nT = (pT * vF) / (R * tT)
-nRC = nT * (tT - tH) / (tH - tF) + nF # nRC = nT * (tT - tH) / (tH - tF) + nF
-nRH = nT * (tC - tT) / (tF - tC) + nF # nRH = nT * (tC - tT) / (tF - tC) + nF
-nR = max(0, max(nRC, nRH)) # nR = max(0, max(nRC, nRH))
+nT = (pT*vF)/(R*tT) # (a) nT = (pT*vF)/(R*tT)
+nRC = nT*(tT-tH)/(tH-tF)+nF # (b) nRC = nT*(tT-tH)/(tH-tF)+nF
+nRH = nT*(tC-tT)/(tF-tC)+nF # (c) nRH = nT*(tC-tT)/(tF-tC)+nF
+nR = max(0, max(nRC, nRH)) # (d) nR = max(0, max(nRC, nRH))
+nI = nT-nF+nR # (e) nI = nT-nF+nR
+tI = (tT*nT-tF*(nF-nR))/nI # (f) tI = (tT*nT-tF*(nF-nR))/nI
+nH = nI*(tC-tI)/(tC-tH) # (g) nH = nI*(tC-tI)/(tC-tH)
+nC = nI-nH # (h) nC=nI-nH
 
+nCmem.Setting = nC
+nHmem.Setting = nH
+
+db.Setting = 1
+jr(0)
