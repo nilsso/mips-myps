@@ -2,10 +2,16 @@ use std::{fmt, fmt::Display};
 
 use ast_traits::{AstNode, IntoAst};
 use crate::ast::{RegBase, Num, MipsNode};
-use crate::{Mips, MipsError, MipsParser, MipsResult, Pair, Rule};
+use crate::{Aliases, MipsError, MipsParser, MipsResult, Pair, Rule};
 
 #[derive(Clone, Debug)]
-pub struct LineAbs(pub(crate) Num);
+pub struct LineAbs(pub Num);
+
+impl LineAbs {
+    pub fn reduce(self, aliases: &Aliases) -> MipsResult<Self> {
+        Ok(Self(self.0.reduce(aliases)?))
+    }
+}
 
 impl<'i> MipsNode<'i> for LineAbs {
     fn as_reg_base(&self) -> Option<RegBase> {
@@ -19,9 +25,17 @@ impl<'i> MipsNode<'i> for LineAbs {
     fn as_alias(&self) -> Option<&String> {
         self.0.as_alias()
     }
+}
 
-    fn reduce(self, mips: &Mips) -> MipsResult<Self> {
-        Ok(Self(self.0.reduce(mips)?))
+impl From<f64> for LineAbs {
+    fn from(n: f64) -> Self {
+        Self(n.into())
+    }
+}
+
+impl From<i64> for LineAbs {
+    fn from(n: i64) -> Self {
+        (n as f64).into()
     }
 }
 
@@ -43,7 +57,13 @@ impl Display for LineAbs {
 }
 
 #[derive(Clone, Debug)]
-pub struct LineRel(pub(crate) Num);
+pub struct LineRel(pub Num);
+
+impl LineRel {
+    pub fn reduce(self, aliases: &Aliases) -> MipsResult<Self> {
+        Ok(Self(self.0.reduce(aliases)?))
+    }
+}
 
 impl<'i> MipsNode<'i> for LineRel {
     fn as_reg_base(&self) -> Option<RegBase> {
@@ -57,9 +77,17 @@ impl<'i> MipsNode<'i> for LineRel {
     fn as_alias(&self) -> Option<&String> {
         self.0.as_alias()
     }
+}
 
-    fn reduce(self, mips: &Mips) -> MipsResult<Self> {
-        Ok(Self(self.0.reduce(mips)?))
+impl From<f64> for LineRel {
+    fn from(n: f64) -> Self {
+        Self(n.into())
+    }
+}
+
+impl From<i64> for LineRel {
+    fn from(n: i64) -> Self {
+        (n as f64).into()
     }
 }
 

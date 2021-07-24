@@ -1,9 +1,9 @@
 use ast_traits::{AstNode, IntoAst};
-use mips::{Mips, MipsResult};
+use mips::{Mips, MipsResult, Rule as MipsRule, MipsParser, MipsError};
 use mips::ast::MipsNode;
 
 use crate::{MypsError, MypsParser, MypsResult, Pair, Rule};
-use crate::lexer::MypsLexer;
+// use crate::lexer::MypsLexer;
 
 // Helper for From<{primitive}> for Num and Expr
 macro_rules! impl_from_primitive {
@@ -27,14 +27,6 @@ macro_rules! impl_from_primitive {
     };
 }
 
-use mips::{Rule as MipsRule, MipsParser, MipsError};
-
-pub trait IntoMips<'i> {
-    type Output;
-
-    fn try_into_mips(self, mips: &Mips) -> MipsResult<Self::Output>;
-}
-
 mod var;
 pub use var::Var;
 
@@ -45,7 +37,7 @@ mod num;
 pub use num::Num;
 
 mod func;
-pub use func::Func;
+pub use func::{Arg, Func};
 
 mod expr;
 pub use expr::{BinaryOp, Expr, UnaryOp};
@@ -72,7 +64,7 @@ mod block;
 pub use block::Block;
 
 mod item;
-pub use item::Item;
+pub use item::{Item, LineItem, LineItemMut};
 
 // use mips::ast::MipsNode;
 // use crate::MypsTranslator;

@@ -36,12 +36,6 @@ impl<'i> AstNode<'i, Rule, MypsParser, MypsError> for Unit {
                     .into_iter()
                     .map(Expr::try_from_pair)
                     .collect::<MypsResult<Vec<_>>>().unwrap();
-                for (lv, expr) in lvs.iter().zip(exprs.iter()) {
-                    // TODO: Need different structure for right-hand-side things
-                    // needs to encompass expressions and devices
-                    // Gonna rename Rv to Value and let Rv be the enum to store either
-                    // a device or a value
-                }
                 Ok(Self::LvRvAsn(lvs, exprs))
             }
             Rule::unit_mips => {

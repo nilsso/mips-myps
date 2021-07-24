@@ -7,8 +7,18 @@ use crate::{MipsError, MipsParser, MipsResult, Pair, Rule};
 
 #[derive(Clone, Debug)]
 pub struct Line {
-    pub(crate) stmt: Stmt,
-    pub(crate) comment_opt: Option<String>,
+    pub stmt: Stmt,
+    pub comment_opt: Option<String>,
+}
+
+impl Line {
+    pub fn new(stmt: Stmt, comment_opt: Option<String>) -> Self {
+        Self { stmt, comment_opt }
+    }
+
+    pub fn new_no_comment(stmt: Stmt) -> Self {
+        Self::new(stmt, None)
+    }
 }
 
 impl<'i> AstNode<'i, Rule, MipsParser, MipsError> for Line {
@@ -29,7 +39,11 @@ impl Display for Line {
         let Self { stmt, comment_opt } = self;
 
         if let Some(comment) = comment_opt {
-            write!(f, "{} {}", stmt, comment)
+            if matches!(stmt, Stmt::Empty(..)) {
+                write!(f, "{}", comment)
+            } else {
+                write!(f, "{} {}", stmt, comment)
+            }
         } else {
             write!(f, "{}", stmt)
         }

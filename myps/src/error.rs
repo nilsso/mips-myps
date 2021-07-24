@@ -20,7 +20,9 @@ pub enum MypsError {
 
     AliasUndefined(String),
 
-    NumFuncUnknown(String),
+    FuncUnknown(String),
+    FuncArgsWrongNum(String),
+    FuncArgsWrongKinds(String),
 
     LvReservedName(String),
     LvRvAsnWrongNum(String),
@@ -34,8 +36,25 @@ impl MypsError {
         Self::AliasUndefined(format!("Alias '{}' undefined", key))
     }
 
-    pub fn num_func_unknown(name: &str) -> Self {
-        Self::NumFuncUnknown(format!("Unknown function '{}'", name))
+    pub fn func_unknown(name: &str) -> Self {
+        Self::FuncUnknown(format!("Unknown function '{}'", name))
+    }
+
+    pub fn func_args_wrong_num(name: &str, expected: usize, found: usize) -> Self {
+        Self::FuncArgsWrongNum(format!("Expected {} arguments for '{}', found {}", expected, name, found))
+    }
+
+    pub fn func_args_wrong_kinds(
+        name: &str,
+        expected: &'static str,
+        found: &str,
+    ) -> Self {
+        Self::FuncArgsWrongKinds(format!(
+            "Instruction '{}' expects arguments ({}), found ({})",
+            name,
+            expected,
+            found,
+        ))
     }
 
     pub fn lv_reserved_name(name: String) -> Self {
@@ -71,7 +90,9 @@ impl Display for MypsError {
 
             Self::AstErrorBase(e) => write!(f, "{}", e),
 
-            Self::NumFuncUnknown(s)
+            Self::FuncUnknown(s)
+            | Self::FuncArgsWrongNum(s)
+            | Self::FuncArgsWrongKinds(s)
             | Self::LvReservedName(s)
             | Self::AliasUndefined(s)
             | Self::LvRvAsnWrongNum(s)

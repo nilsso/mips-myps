@@ -2,9 +2,9 @@ use lazy_static::lazy_static;
 use pest::prec_climber::{Assoc, Operator, PrecClimber};
 
 use ast_traits::{AstError, AstNode, AstPair, AstPairs, IntoAst};
-use mips::{Mips, MipsResult};
+use mips::MipsResult;
 
-use crate::ast::{IntoMips, Num};
+use crate::ast::Num;
 use crate::{MypsError, MypsParser, MypsResult, Pair, Pairs, Rule};
 
 #[rustfmt::skip]
@@ -42,6 +42,7 @@ impl<'i> AstNode<'i, Rule, MypsParser, MypsError> for BinaryOp {
     const RULE: Rule = Rule::op_b;
 
     fn try_from_pair(pair: Pair) -> MypsResult<Self::Output> {
+        #[rustfmt::skip]
         match pair.as_rule() {
             // Numerical
             Rule::op_b_add => Ok(Self::Add),
@@ -52,15 +53,15 @@ impl<'i> AstNode<'i, Rule, MypsParser, MypsError> for BinaryOp {
             Rule::op_b_pow => Ok(Self::Pow),
             // Logical
             Rule::op_b_and => Ok(Self::And),
-            Rule::op_b_or => Ok(Self::Or),
+            Rule::op_b_or  => Ok(Self::Or),
             Rule::op_b_xor => Ok(Self::Xor),
             // Relational
-            Rule::op_b_eq => Ok(Self::Eq),
-            Rule::op_b_ge => Ok(Self::Ge),
-            Rule::op_b_gt => Ok(Self::Gt),
-            Rule::op_b_le => Ok(Self::Le),
-            Rule::op_b_lt => Ok(Self::Lt),
-            Rule::op_b_ne => Ok(Self::Ne),
+            Rule::op_b_eq  => Ok(Self::Eq),
+            Rule::op_b_ge  => Ok(Self::Ge),
+            Rule::op_b_gt  => Ok(Self::Gt),
+            Rule::op_b_le  => Ok(Self::Le),
+            Rule::op_b_lt  => Ok(Self::Lt),
+            Rule::op_b_ne  => Ok(Self::Ne),
             _ => Err(MypsError::pair_wrong_rule("a binary operator", pair)),
         }
     }
@@ -74,7 +75,13 @@ pub enum Expr {
     Ternary { cond: Num, if_t: Num, if_f: Num },
 }
 
-impl_from_primitive!(Expr, Expr::Num, n, { n.into() });
+fn bool_to_float(b: bool) -> f64 {
+    if b {
+        1_f64
+    } else {
+        0_f64
+    }
+}
 
 impl Expr {
     pub fn unary(op: UnaryOp, rhs: Expr) -> Self {
@@ -94,6 +101,79 @@ impl Expr {
         let if_f = if_f.into();
         Self::Ternary { cond, if_t, if_f }
     }
+
+    pub fn simplify(self) -> Self {
+        match self {
+            Self::Unary { op, rhs } => {
+                let rhs = rhs.simplify();
+                match rhs {
+                    Num::Lit(n) => {
+                        let n = match op {
+                            UnaryOp::Inv => -n,
+                            UnaryOp::Not => bool_to_float(n == 0_f64),
+                        };
+                        n.into()
+                    }
+                    rhs => Self::Unary { op, rhs },
+                }
+            }
+            Self::Binary { op, lhs, rhs } => {
+                let lhs = lhs.simplify();
+                let rhs = rhs.simplify();
+                match (lhs, rhs) {
+                    (Num::Lit(l), Num::Lit(r)) => {
+                        #[rustfmt::skip]
+                        let n = match op {
+                            BinaryOp::Add => l + r,
+                            BinaryOp::Sub => l - r,
+                            BinaryOp::Mul => l * r,
+                            BinaryOp::Div => l / r,
+                            BinaryOp::Rem => l % r,
+                            BinaryOp::Pow => l.powf(r),
+                            // Logical
+                            BinaryOp::And => bool_to_float((l != 0_f64) & (r != 0_f64)),
+                            BinaryOp::Nor => unimplemented!(),
+                            BinaryOp::Or  => bool_to_float((l != 0_f64) | (r != 0_f64)),
+                            BinaryOp::Xor => bool_to_float((l != 0_f64) ^ (r != 0_f64)),
+                            // Relational
+                            BinaryOp::Eq  => bool_to_float(l == r),
+                            BinaryOp::Ge  => bool_to_float(l >= r),
+                            BinaryOp::Gt  => bool_to_float(l >  r),
+                            BinaryOp::Le  => bool_to_float(l <= r),
+                            BinaryOp::Lt  => bool_to_float(l <  r),
+                            BinaryOp::Ne  => bool_to_float(l != r),
+                        };
+                        n.into()
+                    }
+                    (lhs, rhs) => Self::Binary { op, lhs, rhs },
+                }
+            }
+            Self::Ternary { cond, if_t, if_f } => {
+                let cond = cond.simplify();
+                let if_t = if_t.simplify();
+                let if_f = if_f.simplify();
+                match (cond, if_t, if_f) {
+                    (Num::Lit(c), Num::Lit(t), Num::Lit(f)) => {
+                        if c != 0_f64 {
+                            t.into()
+                        } else {
+                            f.into()
+                        }
+                    }
+                    (cond, if_t, if_f) => Self::Ternary { cond, if_t, if_f },
+                }
+            }
+            _ => self,
+        }
+    }
+}
+
+impl_from_primitive!(Expr, Expr::Num, n, { n.into() });
+
+impl From<Num> for Expr {
+    fn from(num: Num) -> Self {
+        Self::Num(num)
+    }
 }
 
 impl<'i> AstNode<'i, Rule, MypsParser, MypsError> for Expr {
@@ -102,56 +182,34 @@ impl<'i> AstNode<'i, Rule, MypsParser, MypsError> for Expr {
     const RULE: Rule = Rule::expr;
 
     fn try_from_pair(pair: Pair<'i>) -> MypsResult<Self::Output> {
-        match pair.as_rule() {
-            Rule::expr => pair.only_inner().unwrap().try_into_ast(),
+        let expr = match pair.as_rule() {
+            Rule::expr => pair.only_inner().unwrap().try_into_ast().unwrap(),
             Rule::expr_unary => {
                 let mut pairs = pair.into_inner();
                 let op = pairs.next_pair().unwrap().try_into_ast().unwrap();
                 let rhs = pairs.final_pair().unwrap().try_into_ast().unwrap();
-                Ok(Expr::unary(op, rhs))
+                Expr::unary(op, rhs)
             }
-            Rule::expr_binary => Ok(expr_climb(pair.into_inner())),
+            Rule::expr_binary => expr_climb(pair.into_inner()),
             Rule::expr_ternary => {
                 let mut pairs = pair.into_inner();
                 let cond = pairs.next_pair().unwrap().try_into_ast().unwrap();
                 let if_t = pairs.next_pair().unwrap().try_into_ast().unwrap();
                 let if_f = pairs.final_pair().unwrap().try_into_ast().unwrap();
-                Ok(Expr::ternary(cond, if_t, if_f))
+                Expr::ternary(cond, if_t, if_f)
             }
-            Rule::num_var | Rule::num | Rule::var => Ok(Self::Num(pair.try_into_ast().unwrap())),
+            Rule::num_var | Rule::num | Rule::var => Self::Num(pair.try_into_ast().unwrap()),
             _ => {
                 return Err(MypsError::pair_wrong_rule(
                     "an expression or number-like",
                     pair,
                 ))
             }
-        }
+        };
+        Ok(expr.simplify())
     }
 }
 
-impl<'i> IntoMips<'i> for Expr {
-    type Output = (usize, mips::ast::Num, Vec<mips::ast::Stmt>);
-
-    fn try_into_mips(self, mips: &Mips) -> MipsResult<Self::Output> {
-        match self {
-            Self::Num(num) => {
-                unimplemented!();
-            }
-            Self::Unary { op, rhs } => {
-                unimplemented!();
-            }
-            Self::Binary { op, lhs, rhs } => {
-                // let a = lhs.try_into_mips(mips);
-                unimplemented!();
-            }
-            Self::Ternary { cond, if_t, if_f } => {
-                unimplemented!();
-            }
-        }
-    }
-}
-
-// Operator precedence climber
 #[rustfmt::skip]
 use Rule::{
     // Numerical

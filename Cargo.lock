@@ -126,6 +126,7 @@ version = "0.1.0"
 dependencies = [
  "ast-traits",
  "itertools",
+ "maplit",
  "pest",
  "pest_derive",
  "ron",
@@ -290,6 +291,7 @@ dependencies = [
 name = "translator"
 version = "0.1.0"
 dependencies = [
+ "itertools",
  "maplit",
  "mips",
  "myps",

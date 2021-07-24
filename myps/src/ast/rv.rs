@@ -1,6 +1,7 @@
 use std::{fmt, fmt::Display};
 
 use ast_traits::{AstError, AstNode, AstPair, IntoAst};
+use mips::MipsResult;
 
 use crate::ast::{Dev, Expr, Var};
 use crate::{MypsError, MypsParser, MypsResult, Pair, Rule};

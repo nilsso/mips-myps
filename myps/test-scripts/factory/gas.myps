@@ -1,0 +1,19 @@
+furnace = d0
+sourceC = d1
+sourceH = d2
+
+def vF = 1000
+def R = 8.314
+def tT = 1000
+def pT = 10000
+# Read devices
+tF = furnace.Temperature
+nF = furnace.TotalMoles
+tC = sourceC.Temperature
+tH = sourceH.Temperature
+# Calculate
+nT = (pT * vF) / (R * tT) # nT = (pT * vF) / (R * tT)
+nRC = nT * (tT - tH) / (tH - tF) + nF # nRC = nT * (tT - tH) / (tH - tF) + nF
+nRH = nT * (tC - tT) / (tF - tC) + nF # nRH = nT * (tC - tT) / (tF - tC) + nF
+nR = max(0, max(nRC, nRH)) # nR = max(0, max(nRC, nRH))
+

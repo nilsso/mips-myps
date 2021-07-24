@@ -1,4 +1,5 @@
 use ast_traits::{AstError, AstNode, AstPair, AstPairs, IntoAst};
+use mips::MipsResult;
 
 use crate::ast::{Expr, Var};
 use crate::{MypsError, MypsParser, MypsResult, Pair, Rule};

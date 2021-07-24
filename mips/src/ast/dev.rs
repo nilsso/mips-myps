@@ -1,13 +1,19 @@
 use std::{fmt, fmt::Display};
 
 use ast_traits::{AstNode, AstPair, IntoAst};
-use crate::ast::{MipsNode, RegLit, RegBase};
-use crate::{Mips, MipsError, MipsParser, MipsResult, Pair, Rule};
+use crate::ast::{MipsNode, RegLit, RegBase, FixMode};
+use crate::{Aliases, MipsError, MipsParser, MipsResult, Pair, Rule};
 
-#[derive(Clone, Debug)]
+#[derive(Copy, Clone, Debug)]
 pub struct DevLit {
-    pub(crate) index: usize,
-    pub(crate) indirections: usize,
+    pub index: usize,
+    pub indirections: usize,
+}
+
+impl DevLit {
+    pub fn new(index: usize, indirections: usize) -> Self {
+        Self { index, indirections }
+    }
 }
 
 impl<'i> AstNode<'i, Rule, MipsParser, MipsError> for DevLit {
@@ -37,10 +43,16 @@ impl Display for DevLit {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Copy, Clone, Debug)]
 pub enum DevBase {
     DB,
     Lit(DevLit),
+}
+
+impl From<DevLit> for DevBase {
+    fn from(dev_lit: DevLit) -> Self {
+        Self::Lit(dev_lit)
+    }
 }
 
 impl<'i> AstNode<'i, Rule, MipsParser, MipsError> for DevBase {
@@ -78,11 +90,41 @@ pub enum Dev {
     Alias(String),
 }
 
+impl Dev {
+    pub fn reduce(self, aliases: &Aliases) -> MipsResult<Self> {
+        match self {
+            Self::Base(..) => Ok(self),
+            Self::Alias(key) => {
+                Ok(Self::Base(aliases.try_get_dev_base(&key)?))
+            },
+        }
+    }
+}
+
+impl From<DevBase> for Dev {
+    fn from(dev_base: DevBase) -> Self {
+        Self::Base(dev_base)
+    }
+}
+
+impl From<String> for Dev {
+    fn from(key: String) -> Self {
+        Self::Alias(key)
+    }
+}
+
+impl From<DevLit> for Dev {
+    fn from(dev_lit: DevLit) -> Self {
+        Self::Base(dev_lit.into())
+    }
+}
+
 impl<'i> MipsNode<'i> for Dev {
     fn as_reg_base(&self) -> Option<RegBase> {
         match self {
             &Self::Base(DevBase::Lit(DevLit { index, indirections })) if indirections > 0 => {
-                Some(RegBase::Lit(RegLit { index, indirections, fixed: true }))
+                let reg_lit = RegLit { index, indirections, fix_mode: FixMode::None };
+                Some(RegBase::Lit(reg_lit))
             }
             _ => None,
         }
@@ -96,13 +138,6 @@ impl<'i> MipsNode<'i> for Dev {
         match self {
             Self::Alias(key) => Some(key),
             _ => None,
-        }
-    }
-
-    fn reduce(self, mips: &Mips) -> MipsResult<Self> {
-        match self {
-            Self::Base(..) => Ok(self),
-            Self::Alias(key) => Ok(Self::Base(mips.get_only_dev_base(&key)?)),
         }
     }
 }

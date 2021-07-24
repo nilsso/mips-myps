@@ -1,7 +1,7 @@
 use ast_traits::{AstError, AstNode, AstPair, AstPairs, IntoAst};
-use mips::{Mips, MipsResult};
+use mips::MipsResult;
 
-use crate::ast::{Dev, Expr, IntoMips, Rv, Var, Func};
+use crate::ast::{Dev, Expr, Rv, Var, Func, Lv};
 use crate::{MypsError, MypsParser, MypsResult, Pair, Pairs, Rule};
 
 #[derive(Clone, Debug)]
@@ -10,10 +10,6 @@ pub enum Num {
     Var(Var),
     Expr(Box<Expr>),
     Func(Box<Func>),
-    // Func {
-    //     name: String,
-    //     args: Vec<Rv>,
-    // },
     DevParam {
         dev: Dev,
         param: String,
@@ -26,7 +22,7 @@ pub enum Num {
     DevReagent {
         dev: Dev,
         mode: Box<Num>,
-        param: String,
+        reagent: String,
     },
     NetParam {
         hash: Box<Num>,
@@ -37,6 +33,15 @@ pub enum Num {
 
 impl_from_primitive!(Num, Num::Lit, n, { n as f64 });
 
+impl Num {
+    pub fn simplify(self) -> Self {
+        match self {
+            Self::Expr(box expr) => expr.simplify().into(),
+            _ => self,
+        }
+    }
+}
+
 impl From<Expr> for Num {
     fn from(expr: Expr) -> Self {
         if let Expr::Num(num) = expr {
@@ -46,6 +51,11 @@ impl From<Expr> for Num {
         }
     }
 }
+
+// impl Into<mips::ast::Arg> for Num {
+//     fn into(self) -> mips::ast::Arg {
+//     }
+// }
 
 impl<'i> AstNode<'i, Rule, MypsParser, MypsError> for Num {
     type Output = Self;
@@ -101,10 +111,10 @@ impl<'i> AstNode<'i, Rule, MypsParser, MypsError> for Num {
                 let mut pairs = pair.into_inner();
                 let dev = pairs.next_pair().unwrap().try_into_ast().unwrap();
                 let mode = pairs.next_pair().unwrap().try_into_ast().unwrap();
-                let param = pairs.final_pair().unwrap().try_into_ast().unwrap();
+                let reagent = pairs.final_pair().unwrap().try_into_ast().unwrap();
 
                 let mode = Box::new(mode);
-                Ok(Self::DevReagent { dev, mode, param })
+                Ok(Self::DevReagent { dev, mode, reagent })
             }
             //  The value from batch-reading the parameter of devices on the data network
             Rule::num_net_param => {
@@ -118,41 +128,5 @@ impl<'i> AstNode<'i, Rule, MypsParser, MypsError> for Num {
             }
             _ => Err(MypsError::pair_wrong_rule("a number-like", pair)),
         }
-    }
-}
-
-impl<'i> IntoMips<'i> for Num {
-    type Output = (usize, mips::ast::Num, Vec<mips::ast::Stmt>);
-
-    fn try_into_mips(self, mips: &Mips) -> MipsResult<Self::Output> {
-        let output = match self {
-            Self::Lit(n) => {
-                let num = mips::ast::Num::Lit(n);
-                (0, num, Vec::new())
-            },
-            Self::Var(Var { key, fixed }) => {
-                let num = mips::ast::Num::Alias(key);
-                (0, num, Vec::new())
-            }
-            Self::Expr(box expr) => {
-                expr.try_into_mips(mips).unwrap()
-            },
-            Self::Func(box func) => {
-                unimplemented!();
-            }
-            Self::DevParam { dev, param } => {
-                unimplemented!();
-            }
-            Self::DevSlot { dev, slot, param } => {
-                unimplemented!();
-            }
-            Self::DevReagent { dev, mode, param } => {
-                unimplemented!();
-            }
-            Self::NetParam { hash, mode, param } => {
-                unimplemented!();
-            }
-        };
-        Ok(output)
     }
 }

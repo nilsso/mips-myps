@@ -18,11 +18,12 @@ pub enum MipsError {
 
     LineError(String),
 
+    IndexInvalid(String),
     AliasUndefined(String),
     AliasWrongKind(String),
     InstrUnknown(String),
     ArgsWrongNum(String),
-    ArgWrongKind(String),
+    ArgsWrongKinds(String),
 }
 
 // impl AstError for MipsError {
@@ -32,6 +33,10 @@ pub enum MipsError {
 // }
 
 impl MipsError {
+    pub fn index_invalid<T: std::fmt::Display>(index: T) -> Self {
+        Self::IndexInvalid(format!("Index '{}' is invalid", index))
+    }
+
     pub fn pair_wrong_rule<'i>(expected: &'static str, found: Pair<'i>) -> Self {
         Self::AstErrorBase(AstErrorBase::pair_wrong_rule(expected, found))
     }
@@ -48,16 +53,25 @@ impl MipsError {
         Self::InstrUnknown(format!("Instruction {} unknown", key))
     }
 
-    pub fn args_wrong_num(expected: usize, found: usize) -> Self {
-        Self::ArgsWrongNum(format!("Expected {} arguments, found {}", expected, found))
+    pub fn args_wrong_num(name: &str, expected: usize, found: usize) -> Self {
+        Self::ArgsWrongNum(format!(
+                "Instruction '{}' expects {} arguments, found {}",
+                name,
+                expected,
+                found
+        ))
     }
 
-    pub fn arg_wrong_kind<'i>(expected: &'static str, found: Pair<'i>) -> Self {
-        Self::ArgWrongKind(format!(
-            "Expected {} argument, found {} (a {:?})",
+    pub fn args_wrong_kinds(
+        name: &str,
+        expected: &'static str,
+        found: &str,
+    ) -> Self {
+        Self::ArgsWrongKinds(format!(
+            "Instruction '{}' expects arguments ({}), found ({})",
+            name,
             expected,
-            found.as_str(),
-            found.as_rule()
+            found,
         ))
     }
 }
@@ -72,12 +86,13 @@ impl Display for MipsError {
 
             Self::AstErrorBase(e) => write!(f, "{}", e),
 
-            Self::LineError(s)
+            Self::IndexInvalid(s)
+            | Self::LineError(s)
             | Self::AliasUndefined(s)
             | Self::AliasWrongKind(s)
             | Self::InstrUnknown(s)
             | Self::ArgsWrongNum(s)
-            | Self::ArgWrongKind(s) => write!(f, "{}", s),
+            | Self::ArgsWrongKinds(s) => write!(f, "{}", s),
         }
     }
 }

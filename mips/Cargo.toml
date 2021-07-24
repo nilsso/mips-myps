@@ -6,6 +6,7 @@ edition = "2018"
 [dependencies]
 ast-traits = { path = "../ast-traits" }
 # ast-common = { path = "../ast-common" }
+maplit = "*"
 itertools = "*"
 pest = "*"
 pest_derive = "*"

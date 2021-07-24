@@ -1,0 +1,19 @@
+sorter = d0
+selfMem = d1
+downMem = d2
+upMem = db
+fix selfReq, downReq, upReq, updateUpReq
+loop: # loop
+    yield()
+    tag updateSelfRequest: # updateSelfRequest:
+        selfReqCurr = selfMem.Setting # selfReqCurr = selfMem.Setting
+        if selfReqCurr != selfReq: # if selfReqCurr != selfReq:
+            selfReq = selfReqCurr # selfReq = selfReqCurr
+            updateUpReq = 1 # updateUpReq = 1
+    # (end updateSelfRequest)
+    tag updateDownRequest: # updateDownRequest:
+        if dse(downMem): # if dse(downMem):
+            downReqCurr = downMem.Setting # downReqCurr = downMem.Setting
+            if downReqCurr != downReq: # if downReqCurr != downREq:
+                downReq = downReqCurr # downReq = downReqCurr
+                updateUpReq = 1 # updateUpReq = 1

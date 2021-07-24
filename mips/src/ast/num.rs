@@ -1,14 +1,33 @@
 use std::{fmt, fmt::Display};
 
+use crate::ast::{MipsNode, Reg, RegBase};
+use crate::{Alias, Aliases, MipsError, MipsParser, MipsResult, Pair, Rule};
 use ast_traits::{AstNode, IntoAst};
-use crate::ast::{RegBase, MipsNode};
-use crate::{Alias, Mips, MipsError, MipsParser, MipsResult, Pair, Rule};
 
 #[derive(Clone, Debug)]
 pub enum Num {
     Lit(f64),
     Reg(RegBase),
     Alias(String),
+}
+
+impl Num {
+    pub fn reduce(self, aliases: &Aliases) -> MipsResult<Self> {
+        match self {
+            Self::Lit(..) | Self::Reg(..) => Ok(self),
+            Self::Alias(key) => {
+                let alias = aliases.get(&key)
+                    .ok_or(MipsError::alias_undefined(&key))?;
+                match alias {
+                    Alias::Num(n) => Ok(Self::Lit(*n)),
+                    Alias::Reg(reg_base) => Ok(Self::Reg(reg_base.clone())),
+                    Alias::Dev(..) => {
+                        Err(MipsError::alias_wrong_kind("a number or register", alias))
+                    }
+                }
+            }
+        }
+    }
 }
 
 impl<'i> MipsNode<'i> for Num {
@@ -32,20 +51,6 @@ impl<'i> MipsNode<'i> for Num {
             _ => None,
         }
     }
-
-    fn reduce(self, mips: &Mips) -> MipsResult<Self> {
-        match self {
-            Self::Lit(..) | Self::Reg(..) => Ok(self),
-            Self::Alias(key) => {
-                let alias = mips.try_alias(&key)?;
-                match alias {
-                    Alias::Num(n) => Ok(Self::Lit(*n)),
-                    Alias::Reg(reg_base) => Ok(Self::Reg(reg_base.clone())),
-                    Alias::Dev(..) => Err(MipsError::alias_wrong_kind("a number or register", alias)),
-                }
-            },
-        }
-    }
 }
 
 impl<'i> AstNode<'i, Rule, MipsParser, MipsError> for Num {
@@ -63,10 +68,18 @@ impl<'i> AstNode<'i, Rule, MipsParser, MipsError> for Num {
     }
 }
 
-
 impl From<f64> for Num {
     fn from(num: f64) -> Self {
         Self::Lit(num)
+    }
+}
+
+impl From<Reg> for Num {
+    fn from(reg: Reg) -> Self {
+        match reg {
+            Reg::Base(reg_base) => Self::Reg(reg_base),
+            Reg::Alias { key, .. } => Self::Alias(key),
+        }
     }
 }
 

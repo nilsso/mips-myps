@@ -33,6 +33,7 @@ dev_var = { dev | var }
  *      The value can be a literal integer, a parenthesized expression, or a variable
  *      (which must alias a number/register at runtime). */
 dev_net  = { (int | ("(" ~ expr_var ~ ")") | var) ~ "." ~ "all" }
+/* dev_net  = { (int | ("(" ~ expr_var ~ ")") | var) } */
 
 /* num: Something to be considered as a single, literal numerical value.
  *      Such things are:
@@ -47,11 +48,16 @@ dev_net  = { (int | ("(" ~ expr_var ~ ")") | var) ~ "." ~ "all" }
 num = { num_net_param | num_dev_reagent | num_dev_slot
       | num_dev_param | num_func | ("(" ~ expr_var ~ ")") | dec }
     num_dev_param   = { dev_var ~ "." ~ token }
+    /* num_dev_param   = { dev_var ~ "." ~ "l" ~ "(" ~ token ~ ")" } */
     num_dev_slot    = { dev_var ~ "[" ~ mode ~ "]" ~ "." ~ token }
+    /* num_dev_slot    = { dev_var ~ "." ~ "ls" ~ "(" ~ mode ~ "," ~ token ~ ")" } */
     num_dev_reagent = { dev_var ~ "{" ~ mode ~ "}" ~ "." ~ token }
+    /* num_dev_reagent = { dev_var ~ "." ~ "lr" ~ "(" ~ mode ~ "," ~ token ~ ")" } */
     num_net_param   = { dev_net ~ "." ~ mode ~ "." ~ token }
-    num_func        = { token ~ "(" ~ num? ~ ("," ~ num)* ~ ")" }
-        mode = _{ int | var | ("(" ~ num ~ ")") }
+    /* num_net_param   = { dev_net ~ "." ~ "lb" ~ "(" ~ mode ~ "," ~ token ~ ")" } */
+    num_func        = { func_name ~ "(" ~ rv? ~ ("," ~ rv)* ~ ")" }
+        func_name = @{ "d"? ~ token }
+        mode = _{ expr_var }
 num_var = { num | var }
 
 /* operators */
@@ -102,9 +108,10 @@ rv = { expr | dev | var }
  *      register which the variable aliases), a device parameter (as per writing a number to the
  *      parameter of a device) or a batch-device parameter (as per batch-writing a number to the
  *      parameter of devices on the data network). */
-lv = { lv_net_param | lv_dev_param | lv_var }
+lv = { lv_net_param | lv_dev_param | lv_def | lv_var }
     lv_dev_param = { dev_var ~ "." ~ token }
     lv_net_param = { dev_net ~ "." ~ token }
+    lv_def = { "def" ~ var }
     lv_var = { var_fixed | var }
         var_fixed = { "fix" ~ var }
 
@@ -124,9 +131,10 @@ line = ${ indent ~ item ~ WHITESPACE* ~ comment }
                 branch_for   = { "for" ~ var ~ "in" ~
                     "(" ~ expr_var ~ ":" ~ expr_var ~ (":" ~ expr_var)? ~ ")" }
 
-        stmt = { stmt_lvrv_asn | stmt_self_asn | stmt_mips | stmt_empty }
-            stmt_lvrv_asn = { lv ~ ("," ~ lv)* ~ "=" ~ rv ~ ("," ~ rv)*  }
-            stmt_self_asn = { lv ~ op_s ~ expr }
+        stmt = { stmt_asn | stmt_fix | stmt_self_asn | stmt_mips | stmt_empty }
+            stmt_asn = { lv ~ "=" ~ rv  }
+            stmt_fix = { "fix" ~ token ~ ("," ~ token)* }
+            stmt_self_asn = { var ~ op_s ~ expr_var }
             stmt_mips = { token ~ "(" ~ (rv ~ ",")* ~ rv? ~ ")" }
             stmt_empty = { "" }
 

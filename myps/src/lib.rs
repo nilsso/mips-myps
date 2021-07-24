@@ -1,6 +1,7 @@
 #![feature(bool_to_option)]
 #![feature(box_patterns)]
 #![feature(stmt_expr_attributes)]
+#![feature(map_try_insert)]
 #![feature(trait_alias)]
 #![allow(unused_imports)]
 #![allow(unused_variables)]

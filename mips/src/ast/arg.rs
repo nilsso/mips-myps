@@ -2,9 +2,9 @@ use std::{fmt, fmt::Display};
 
 use ast_traits::{AstNode, IntoAst};
 use crate::ast::{
-    Dev, LineAbs, LineRel, MipsNode, Num, Reg, RegBase,
+    Dev, DevBase, LineAbs, LineRel, MipsNode, Num, Reg, RegBase, RegLit,
 };
-use crate::{Mips, MipsError, MipsParser, MipsResult, Pair, Rule};
+use crate::{Alias, Aliases, MipsError, MipsParser, MipsResult, Pair, Rule};
 
 #[derive(Clone, Debug)]
 pub enum Arg {
@@ -14,6 +14,46 @@ pub enum Arg {
     LineAbs(LineAbs),
     LineRel(LineRel),
     String(String),
+}
+
+impl Arg {
+    pub fn fixed(&self) -> bool {
+        match self {
+            Self::Reg(reg) => reg.fixed(),
+            _ => false,
+        }
+    }
+
+    pub fn set_fixed(&mut self, new_fixed: bool) {
+        if let Self::Reg(reg) = self {
+            reg.set_fixed(new_fixed);
+        }
+    }
+
+    pub fn as_reg_lit(&self) -> Option<&RegLit> {
+        match self {
+            Self::Reg(reg) => reg.as_reg_lit(),
+            _ => None,
+        }
+    }
+
+    pub fn as_reg_lit_mut(&mut self) -> Option<&mut RegLit> {
+        match self {
+            Self::Reg(reg) => reg.as_reg_lit_mut(),
+            _ => None,
+        }
+    }
+
+    pub fn reduce(self, aliases: &Aliases) -> MipsResult<Self> {
+        match self {
+            Self::Dev(dev) => Ok(Self::Dev(dev.reduce(aliases)?)),
+            Self::Reg(reg) => Ok(Self::Reg(reg.reduce(aliases)?)),
+            Self::Num(num) => Ok(Self::Num(num.reduce(aliases)?)),
+            Self::LineAbs(line_abs) => Ok(Self::LineAbs(line_abs.reduce(aliases)?)),
+            Self::LineRel(line_rel) => Ok(Self::LineRel(line_rel.reduce(aliases)?)),
+            Self::String(..) => Ok(self),
+        }
+    }
 }
 
 impl<'i> MipsNode<'i> for Arg {
@@ -49,15 +89,26 @@ impl<'i> MipsNode<'i> for Arg {
             Self::String(..) => None,
         }
     }
+}
 
-    fn reduce(self, mips: &Mips) -> MipsResult<Self> {
-        match self {
-            Self::Dev(dev) => Ok(Self::Dev(dev.reduce(mips)?)),
-            Self::Reg(reg) => Ok(Self::Reg(reg.reduce(mips)?)),
-            Self::Num(num) => Ok(Self::Num(num.reduce(mips)?)),
-            Self::LineAbs(line_abs) => Ok(Self::LineAbs(line_abs.reduce(mips)?)),
-            Self::LineRel(line_rel) => Ok(Self::LineRel(line_rel.reduce(mips)?)),
-            Self::String(..) => Ok(self),
+impl From<RegBase> for Arg {
+    fn from(reg_base: RegBase) -> Self {
+        Self::Reg(reg_base.into())
+    }
+}
+
+impl From<DevBase> for Arg {
+    fn from(dev_base: DevBase) -> Self {
+        Self::Dev(dev_base.into())
+    }
+}
+
+impl From<&Alias> for Arg {
+    fn from(alias: &Alias) -> Self {
+        match alias {
+            Alias::Num(n) => Self::Num(Num::Lit(*n)),
+            Alias::Dev(dev_base) => Self::Dev(Dev::Base(*dev_base)),
+            Alias::Reg(reg_base) => Self::Reg(Reg::Base(*reg_base)),
         }
     }
 }

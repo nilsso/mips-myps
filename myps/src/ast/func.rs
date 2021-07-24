@@ -3,46 +3,53 @@ use std::convert::TryInto;
 use itertools::join;
 
 use ast_traits::{AstError, AstNode, AstPair, AstPairs, IntoAst};
+use mips::MipsResult;
 
-use crate::ast::{Num, Expr};
+use crate::ast::{Expr, Num, Dev};
 use crate::{MypsError, MypsParser, MypsResult, Pair, Pairs, Rule};
 
-// macro_rules! validate_arg {
-//     (@parse $arg_pair_iter:ident) => {
-//         $arg_pair_iter
-//             .next()
-//             .unwrap()
-//             .try_into_ast::<Rv>()
-//             .unwrap()
-//     };
-//     (Num, $disp:literal, $expected:literal, $args_str:ident, $arg_pair_iter:ident) => {{
-//         let rv = validate_arg!(@parse $arg_pair_iter);
-//         match rv {
-//             Rv::Var(..) | Rv::Expr(..) => rv,
-//             Rv::Dev(..) => {
-//                 return Err(MypsError::num_fun_wrong_args($disp, $expected, &$args_str))
-//             },
-//         }
-//     }};
-//     (Dev, $disp:literal, $expected:literal, $args_str:ident, $arg_pair_iter:ident) => {{
-//         let rv = validate_arg!(@parse $arg_pair_iter);
-//         match rv {
-//             Rv::Var(..) | Rv::Dev(..) => rv,
-//             Rv::Expr(..) => {
-//                 return Err(MypsError::num_fun_wrong_args($disp, $expected, &$args_str))
-//             },
-//         }
-//     }};
-// }
+#[derive(Clone, Debug)]
+pub enum Arg {
+    Expr(Expr),
+    Dev(Dev),
+}
+
+impl From<Expr> for Arg {
+    fn from(expr: Expr) -> Self {
+        Self::Expr(expr)
+    }
+}
+
+impl From<Dev> for Arg {
+    fn from(dev: Dev) -> Self {
+        Self::Dev(dev)
+    }
+}
+
+impl<'i> AstNode<'i, Rule, MypsParser, MypsError> for Arg {
+    type Output = Self;
+
+    const RULE: Rule = Rule::rv;
+
+    fn try_from_pair(pair: Pair<'i>) -> MypsResult<Self::Output> {
+        match pair.as_rule() {
+            Rule::rv => pair.only_inner().unwrap().try_into_ast(),
+            Rule::expr => Ok(Self::Expr(pair.try_into_ast().unwrap())),
+            Rule::dev => Ok(Self::Dev(pair.try_into_ast().unwrap())),
+            // Rule::var => Ok(Self::Var(pair.try_into_ast().unwrap())),
+            _ => Err(MypsError::pair_wrong_rule("an r-value (device or expression)", pair)),
+        }
+    }
+}
 
 macro_rules! def_func {
     ($(
-        ($name:ident, $n_args:literal, $disp:literal)
+        ($name:ident, $n_args:literal, $disp:literal, $expected:literal, [$($arg_kind:ty),*$(,)*])
     ),*$(,)*) => {
         #[derive(Clone, Debug)]
         pub enum Func {
             $(
-                $name([Num; $n_args]),
+                $name([Arg; $n_args]),
             )*
         }
 
@@ -54,44 +61,91 @@ macro_rules! def_func {
             fn try_from_pair(pair: Pair) -> MypsResult<Self::Output> {
                 let mut pairs = pair.into_inner();
                 let name_str = pairs.next_pair().unwrap().as_str();
-                let args = pairs.map(Num::try_from_pair).collect::<MypsResult<Vec<Num>>>().unwrap();
-                match name_str.to_lowercase().as_str() {
+                let arg_pairs = pairs
+                    .map(|pair| {
+                        if matches!(pair.as_rule(), Rule::rv) {
+                            Ok(pair.only_inner().unwrap())
+                        } else {
+                            Err(MypsError::pair_wrong_rule("an r-value", pair))
+                        }
+                    })
+                    .collect::<MypsResult<Vec<_>>>()
+                    .unwrap();
+                #[allow(dead_code, unused_variables, unused_mut)]
+                match name_str {
                     $(
                         $disp => {
-                            if $n_args != args.len() {
-                                return Err(MypsError::pairs_wrong_num($n_args, args.len()));
+                            if $n_args != arg_pairs.len() {
+                                return Err(MypsError::func_args_wrong_num(
+                                    name_str,
+                                    $n_args,
+                                    arg_pairs.len()
+                                ));
                             }
-                            let args: [Num; $n_args] = args.try_into().unwrap();
+                            let found = join(arg_pairs.iter().map(|pair| {
+                                    format!("{:?}", pair.as_rule())
+                                }), ",");
+                            let mut pairs = arg_pairs.into_iter();
+                            let args: [Arg; $n_args] = [
+                                $({
+                                    let pair = pairs.next().unwrap();
+                                    let ast = <$arg_kind>::try_from_pair(pair)
+                                        .map_err(|_| {
+                                            MypsError::func_args_wrong_kinds(
+                                                name_str,
+                                                $expected,
+                                                &found,
+                                            )
+                                        })
+                                        .unwrap();
+                                    ast.into()
+                                }),*
+                            ];
                             Ok(Self::$name(args))
                         }
                     )*
-                    _ => Err(MypsError::num_func_unknown(name_str)),
+                    _ => Err(MypsError::func_unknown(name_str)),
                 }
             }
         }
     };
 }
 
+#[rustfmt::skip]
+use crate::ast::{
+    Dev as D,
+    Expr as E,
+};
+
+#[rustfmt::skip]
 def_func!(
+    (Dns,   1, "dns",   "dev",       [D]),
+    (Dse,   1, "dse",   "dev",       [D]),
     // Math
-    // (Abs,   1
-    // (Acos,  1
-    // (Asin,  1
-    // (Ceil,  1
-    // (Cos,   1
-    // (Exp,   1
-    // (Floor, 1
-    // (Log,   1
-    // (Max,   2
-    // (Min,   2
-    // (Rand,  1
-    // (Round, 1
-    // (Sin,   1
-    // (Sqrt,  1
-    // (Tan,   1
-    (Trunc, 1, "trunc"),
+    (Abs,   1, "abs",   "expr",      [E]),
+    (Acos,  1, "acos",  "nexpr",     [E]),
+    (Asin,  1, "asin",  "expr",      [E]),
+    (Ceil,  1, "ceil",  "expr",      [E]),
+    (Cos,   1, "cos",   "expr",      [E]),
+    (Exp,   1, "exp",   "expr",      [E]),
+    (Floor, 1, "floor", "expr",      [E]),
+    (Log,   1, "log",   "expr",      [E]),
+    (Max,   2, "max",   "expr,expr", [E,E]),
+    (Min,   2, "min",   "expr,expr", [E,E]),
+    (Rand,  0, "rand",  "null",      []),
+    (Round, 1, "round", "expr",      [E]),
+    (Sin,   1, "sin",   "expr",      [E]),
+    (Sqrt,  1, "sqrt",  "expr",      [E]),
+    (Tan,   1, "tan",   "expr",      [E]),
+    (Trunc, 1, "trunc", "expr",      [E]),
     // Stack
-    // (Peek,  0
-    // (Pop,   0
+    (Peek,  0, "peek",  "null",      []),
+    (Pop,   0, "pop",   "null",      []),
 );
 
+// impl<'i> IntoMips<'i> for Func {
+//     type Output = (usize, mips::ast::Num, Vec<mips::ast::Stmt>);
+
+//     fn try_into_mips(self, mips: &Mips) -> MipsResult<Self::Output> {
+//     }
+// }

@@ -13,20 +13,21 @@ pub trait MipsNode<'i>: AstNode<'i, Rule, MipsParser, MipsError> + std::fmt::Deb
 
     fn as_alias(&self) -> Option<&String>;
 
-    fn reduce(self, mips: &Mips) -> MipsResult<Self> where Self: Sized;
+    // fn reduce(self, mips: &Mips) -> MipsResult<Self> where Self: Sized;
 
     fn get_reg_base(&self, mips: &Mips) -> MipsResult<Option<RegBase>> {
         if let Some(reg_base) = self.as_reg_base() {
             Ok(Some(reg_base))
         } else if let Some(key) = self.as_alias() {
-            Ok(mips.get_reg_base(key)?)
+            Ok(mips.aliases.get_reg_base(key)?)
         } else {
             Ok(None)
         }
     }
 
     fn get_reg_lit(&self, mips: &Mips) -> MipsResult<Option<RegLit>> {
-        if let Some(RegBase::Lit(reg_lit)) = self.get_reg_base(mips)? {
+        let res = self.get_reg_base(mips);
+        if let Some(RegBase::Lit(reg_lit)) = res? {
             Ok(Some(reg_lit))
         } else {
             Ok(None)
@@ -66,7 +67,7 @@ mod dev;
 pub use dev::{DevLit, DevBase, Dev};
 
 mod reg;
-pub use reg::{RegLit, RegBase, Reg};
+pub use reg::{RegLit, RegBase, Reg, FixMode};
 
 mod num;
 pub use num::{Num, NumLit};

@@ -1,9 +1,8 @@
 use ast_traits::{AstError, AstNode, AstPair, AstPairs, IntoAst};
-use mips::{MipsResult, Mips};
+use mips::MipsResult;
 
-use crate::ast::{Dev, Expr, IntoMips};
+use crate::ast::{Dev, Expr};
 use crate::{MypsError, MypsParser, MypsResult, Pair, Pairs, Rule};
-use crate::lexer::MypsLexer;
 
 #[derive(Clone, Debug)]
 pub struct Var {
@@ -25,16 +24,5 @@ impl<'i> AstNode<'i, Rule, MypsParser, MypsError> for Var {
             },
             _ => Err(MypsError::pair_wrong_rule("a variable", pair)),
         }
-    }
-}
-
-impl<'i> IntoMips<'i> for Var {
-    type Output = mips::ast::Reg;
-
-    fn try_into_mips(self, mips: &Mips) -> MipsResult<Self::Output> {
-        let Self { key, fixed } = self;
-        unimplemented!();
-        // mips.try_alias(&key);
-        // Ok(Vec::new())
     }
 }

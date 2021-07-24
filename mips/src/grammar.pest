@@ -4,17 +4,18 @@ num = @{ int_part ~ ("." ~ dec_part)? ~ ((^"e" | ^"E") ~ exp_part)? }
     int_part = @{ int }
     dec_part = @{ ASCII_DIGIT+ }
     exp_part = @{ int }
+token = @{ ASCII_ALPHA+ ~ ASCII_ALPHANUMERIC* }
 
 line = ${ SOI ~ item ~ ws* ~ comment? ~ EOI }
     item = _{ (tag ~ ":") | (ws* ~ stmt) | empty }
         empty = { "" }
-        tag = @{ ASCII_ALPHA+ }
+        tag = @{ token }
         stmt = { instr ~ (ws+ ~ arg)* }
             instr = @{ ASCII_ALPHA+ }
             arg = _{ dev | reg | num | alias }
                 dev = ${ "db" | ("d" ~ "r"* ~ index) }
                 reg = ${ "sp" | "ra" | ("r"+ ~ index) }
-                alias = @{ ASCII_ALPHA+ ~ ASCII_ALPHANUMERIC* }
+                alias = @{ token }
                     index = @{ ASCII_DIGIT+ }
 
 comment = @{ "#" ~ (!NEWLINE ~ ANY)* }

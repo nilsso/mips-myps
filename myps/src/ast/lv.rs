@@ -11,10 +11,11 @@ pub enum Lv {
     DevParam { dev: Dev, param: String },
     NetParam { hash: Num, param: String },
     Var(Var),
+    Def(String),
 }
 
 lazy_static! {
-    static ref RESERVED_NAME_PATTERN: Regex = Regex::new(r"d(?:b|0|[1-9]\d*)").unwrap();
+    static ref RESERVED_NAME_PATTERN: Regex = Regex::new(r"(db|((r|d)(0|[1-9]\d*)))").unwrap();
 }
 
 impl<'i> AstNode<'i, Rule, MypsParser, MypsError> for Lv {
@@ -36,6 +37,10 @@ impl<'i> AstNode<'i, Rule, MypsParser, MypsError> for Lv {
                 let hash = pairs.next_pair().unwrap().try_into_ast().unwrap();
                 let param = pairs.final_pair().unwrap().try_into_ast().unwrap();
                 Ok(Self::NetParam { hash, param })
+            }
+            Rule::lv_def => {
+                let name = pair.only_inner().unwrap().try_into_ast().unwrap();
+                Ok(Self::Def(name))
             }
             Rule::var | Rule::var_fixed => {
                 let var = pair.try_into_ast::<Var>().unwrap();
