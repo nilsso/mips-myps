@@ -48,6 +48,7 @@ macro_rules! def_func {
     ),*$(,)*) => {
         #[derive(Clone, Debug)]
         pub enum Func {
+            // Log([Arg; 2]),
             $(
                 $name([Arg; $n_args]),
             )*
@@ -119,28 +120,29 @@ use crate::ast::{
 
 #[rustfmt::skip]
 def_func!(
-    (Dns,   1, "dns",   "dev",       [D]),
-    (Dse,   1, "dse",   "dev",       [D]),
+    (Dns,   1, "dns",   "dev",       [D   ]),
+    (Dse,   1, "dse",   "dev",       [D   ]),
     // Math
-    (Abs,   1, "abs",   "expr",      [E]),
-    (Acos,  1, "acos",  "nexpr",     [E]),
-    (Asin,  1, "asin",  "expr",      [E]),
-    (Ceil,  1, "ceil",  "expr",      [E]),
-    (Cos,   1, "cos",   "expr",      [E]),
-    (Exp,   1, "exp",   "expr",      [E]),
-    (Floor, 1, "floor", "expr",      [E]),
-    (Log,   1, "log",   "expr",      [E]),
-    (Max,   2, "max",   "expr,expr", [E,E]),
-    (Min,   2, "min",   "expr,expr", [E,E]),
-    (Rand,  0, "rand",  "null",      []),
-    (Round, 1, "round", "expr",      [E]),
-    (Sin,   1, "sin",   "expr",      [E]),
-    (Sqrt,  1, "sqrt",  "expr",      [E]),
-    (Tan,   1, "tan",   "expr",      [E]),
-    (Trunc, 1, "trunc", "expr",      [E]),
+    (Abs,   1, "abs",   "expr",      [E   ]),
+    (Acos,  1, "acos",  "nexpr",     [E   ]),
+    (Asin,  1, "asin",  "expr",      [E   ]),
+    (Ceil,  1, "ceil",  "expr",      [E   ]),
+    (Cos,   1, "cos",   "expr",      [E   ]),
+    (Exp,   1, "exp",   "expr",      [E   ]),
+    (Floor, 1, "floor", "expr",      [E   ]),
+    (Log,   2, "log",   "expr",      [E, E]), // custom
+    (Ln,    1, "ln",    "expr",      [E   ]), // rename for Mips.log
+    (Max,   2, "max",   "expr,expr", [E, E]),
+    (Min,   2, "min",   "expr,expr", [E, E]),
+    (Rand,  0, "rand",  "null",      [    ]),
+    (Round, 1, "round", "expr",      [E   ]),
+    (Sin,   1, "sin",   "expr",      [E   ]),
+    (Sqrt,  1, "sqrt",  "expr",      [E   ]),
+    (Tan,   1, "tan",   "expr",      [E   ]),
+    (Trunc, 1, "trunc", "expr",      [E   ]),
     // Stack
-    (Peek,  0, "peek",  "null",      []),
-    (Pop,   0, "pop",   "null",      []),
+    (Peek,  0, "peek",  "null",      [    ]),
+    (Pop,   0, "pop",   "null",      [    ]),
 );
 
 // impl<'i> IntoMips<'i> for Func {

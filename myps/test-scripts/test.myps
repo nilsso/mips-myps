@@ -1,7 +1,6 @@
-j(a)
-# 1
-# 2
-# 3
-# 4
-tag a:
-    a = 1
+fix a = 1
+tag test:
+    fix b = a
+    fix c = a + b
+fix b = a
+fix c = a + b

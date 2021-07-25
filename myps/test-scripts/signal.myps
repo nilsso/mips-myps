@@ -1,0 +1,6 @@
+def OPEN = -1
+def WAIT = -2
+
+loop:
+    yield()
+    m = db.Setting

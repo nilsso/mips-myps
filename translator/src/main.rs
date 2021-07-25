@@ -122,13 +122,7 @@ impl Translator {
         indirections: usize,
         fixed: bool,
     ) -> MipsResult<mips::ast::RegBase> {
-        // if let Some(alias) = self.get_alias(key) {
-        //     match alias {
-        //         Alias::Reg(reg_base) => Ok(*reg_base),
-        //         _ => unreachable!("{:?}", alias),
-        //     }
         if let Some(Alias::Reg(reg_base)) = self.get_alias(key) {
-            // println!("SOME {:?}", reg_base);
             let mut reg_base = *reg_base;
             reg_base.set_fixed(reg_base.fixed() || fixed);
             Ok(reg_base)
@@ -190,7 +184,6 @@ impl Translator {
                 first.comment_opt = comment_opt;
             }
         }
-        // println!("COLLECTED {} LINES", lines.len());
         Ok(lines)
     }
 
@@ -212,82 +205,8 @@ impl Translator {
                     }
                 }
             }
-            // shift_scopes(&mut item_scopes, lines.len());
             lines.extend(item_lines);
-            // scopes.extend(item_scopes);
         }
-        // let (lines, scopes): (Vec<Vec<Line>>, Vec<Vec<Range<usize>>>) = items
-        //     .into_iter()
-        //     .map(|item| self.translate_item(item))
-        //     .collect::<MipsResult<Vec<(Vec<Line>, Vec<Range<usize>>)>>>()
-        //     .unwrap()
-        //     .into_iter()
-        //     .unzip();
-
-        // let lines: Vec<Line> = lines.into_iter().flatten().collect();
-        // let mut scopes: Vec<Range<usize>> = scopes.into_iter().flatten().collect();
-
-        // scopes.sort_by(compare_scopes);
-
-        // let mut lines = Vec::new();
-        // let mut scopes = Vec::new();
-        // let mut hints = BTreeMap::new();
-        // let mut fixed_indices = BTreeSet::new();
-        // for item in items {
-        //     match item {
-        //         Item::Block(..) => {
-        //             // println!("BLOCK");
-        //             let (block_lines, mut block_scopes) = self.translate_item(item).unwrap();
-        //             // println!("BLOCK_LINES");
-        //             // for (i, line) in block_lines.iter().enumerate() {
-        //             //     println!("{}: {}", i, line);
-        //             // }
-        //             // println!("LINES THUS FAR");
-        //             // for (i, line) in lines.iter().enumerate() {
-        //             //     println!("{}: {}", i, line);
-        //             // }
-        //             // println!("BLOCK_HINTS {:#?}", block_hints);
-        //             shift_scopes(&mut block_scopes, lines.len());
-        //             // println!("BLOCK_HINTS SHIFTED {:#?}", block_hints);
-
-        //             lines.extend(block_lines);
-        //             scopes.extend(block_scopes);
-        //         },
-        //         Item::Stmt(..) => {
-        //             let (stmt_lines, _) = self.translate_item(item).unwrap();
-        //             println!("STMT LINES");
-        //             for (i, line) in stmt_lines.iter().enumerate() {
-        //                 println!("{}: {}", i, line);
-        //             }
-        //             for line in stmt_lines.iter() {
-        //                 let reg_arg_opt = if let Stmt::Alias([_, arg]) = &line.stmt {
-        //                     Some(arg)
-        //                 } else {
-        //                     line.stmt.args().first()
-        //                 };
-        //                 if let Some(reg_arg) = reg_arg_opt {
-        //                     if let Some(reg_lit) = reg_arg.as_reg_lit() {
-        //                         if reg_lit.fixed {
-        //                             fixed_indices.insert(reg_lit.index);
-        //                         }
-        //                     }
-        //                 }
-        //                 // if let Some(first_arg) = line.stmt.args().first() {
-        //                 //     if let Some(reg_lit) = first_arg.as_reg_lit() {
-        //                 //         if reg_lit.fixed {
-        //                 //             println!("FIXED INDEX {}", reg_lit.index);
-        //                 //             fixed_indices.insert(reg_lit.index);
-        //                 //         }
-        //                 //     }
-        //                 // }
-        //             }
-        //             lines.extend(stmt_lines);
-        //         },
-        //     }
-        // }
-        // for index in fixed_indices {
-        //     hints.insert(index, 0..lines.len());
-        // }
         Ok(lines)
     }
 
@@ -304,9 +223,11 @@ impl Translator {
             use mips::ast::Stmt;
 
             let c = Arg::Num(Num::Lit(0_f64));
-            translator.next_index -= 1;
             #[rustfmt::skip]
             if let Some(cond_stmt) = cond_stmts.pop() {
+                // Having a statement on the stack means that the register of this last statement
+                // is being thrown out, and so we need to decrement next_index.
+                translator.next_index -= 1;
                 let cond_stmt = match cond_stmt {
                     Stmt::Sap (..)        => unimplemented!(),
                     Stmt::Sapz(..)        => unimplemented!(),
@@ -327,7 +248,6 @@ impl Translator {
                     Stmt::Sne ([_, a, b]) => Stmt::Breq ([a, b, c]),
                     Stmt::Snez([_, a])    => Stmt::Breqz([a,    c]),
                     _ => {
-                        // translator.next_index += 1;
                         cond_stmts.push(cond_stmt);
                         Stmt::Brnez([cond_num.into(), c])
                     },
@@ -368,7 +288,6 @@ impl Translator {
                 lines
             }
             Branch::If { cond, chain_id_opt } => {
-                // println!("IF {:?} {:?}", cond, chain_id_opt);
                 // Translate condition expression to statements
                 let (cond_num, cond_stmts) = self.translate_expr(None, cond).unwrap();
                 // Transform last condition statement to branch
@@ -556,9 +475,6 @@ impl Translator {
                     .chain(cond_lines.into_iter())
                     .chain(body_lines.into_iter())
                     .collect::<Vec<_>>();
-                // Add hint for loop index
-                // hints.insert(i_index, 0..lines.len());
-                // println!("END FOR (INSERT HINT {})", i_index);
                 lines
             }
             Branch::Tag(tag) => {
@@ -641,18 +557,8 @@ impl Translator {
                         Arg::Dev(..) | Arg::Reg(..) | Arg::Num(..) => {
                             *arg = arg.clone().reduce(&self.aliases).unwrap();
                         }
-                        //     LineAbs(LineAbs),
-                        //     LineRel(LineRel),
-                        //     String(String),
                         _ => {}
                     }
-                    // if let Ok(new_arg) = arg.clone().reduce(&self.aliases) {
-                    //     // TODO: Should have a dedicated variant for lines,
-                    //     // and only reduce args if not a line number string (tag)
-                    //     *arg = new_arg;
-                    // } else {
-                    //     *arg = Arg::String(arg.as_alias().unwrap().clone());
-                    // }
                 }
                 Ok(vec![stmt])
             }
@@ -680,7 +586,6 @@ impl Translator {
             let r = num.into();
             let stmt = Stmt::S([d, p, r]);
             stmts.push(stmt);
-            // self.aliases.
             Ok(stmts)
         }
 
@@ -806,21 +711,6 @@ impl Translator {
             }
         }
     }
-
-    // fn simplify_num(&self, num: mips::ast::Num) -> mips::ast::Num {
-    //     use mips::ast::Num;
-
-    //     match num {
-    //         Num::Alias(key) => {
-    //             unimplemented!();
-    //         },
-    //         _ => num,
-    //     }
-    // }
-
-    // fn simplify_expr(&self, expr: mips::ast::Expr) -> mips::ast::Expr {
-    //     unimplemented!();
-    // }
 
     fn translate_expr(
         &mut self,
@@ -1007,19 +897,19 @@ impl Translator {
         use std::iter::once;
 
         macro_rules! translate_fun {
-            ($self:ident, $reg_opt:ident, $mips:path, []) => {{
+            ($self:ident, $reg_opt:ident, [], $mips:path) => {{
                 let reg_base = self.unwrap_reg_base($reg_opt);
                 let stmt = $mips([reg_base.into()]);
                 Ok((reg_base.into(), vec![stmt]))
             }};
-            ($self:ident, $reg_opt:ident, $mips:path, [$a:ident]) => {{
+            ($self:ident, $reg_opt:ident, [$a:ident], $mips:path) => {{
                 let reg_base = self.unwrap_reg_base($reg_opt);
                 let (a, a_stmts) = $self.translate_arg($a).unwrap();
                 let stmt = $mips([reg_base.into(), a.into()]);
                 let stmts = a_stmts.into_iter().chain(once(stmt)).collect();
                 Ok((reg_base.into(), stmts))
             }};
-            ($self:ident, $reg_opt:ident, $mips:path, [$a:ident, $b:ident]) => {{
+            ($self:ident, $reg_opt:ident, [$a:ident, $b:ident], $mips:path) => {{
                 let reg_base = self.unwrap_reg_base($reg_opt);
                 let (a, a_stmts) = $self.translate_arg($a).unwrap();
                 let (b, b_stmts) = $self.translate_arg($b).unwrap();
@@ -1035,26 +925,43 @@ impl Translator {
 
         #[rustfmt::skip]
         match func {
-            Func::Dns  ([d   ]) => translate_fun!(self, reg_base_opt, Stmt::Sdns,  [d   ]),
-            Func::Dse  ([d   ]) => translate_fun!(self, reg_base_opt, Stmt::Sdse,  [d   ]),
-            Func::Abs  ([a   ]) => translate_fun!(self, reg_base_opt, Stmt::Abs,   [a   ]),
-            Func::Acos ([a   ]) => translate_fun!(self, reg_base_opt, Stmt::Acos,  [a   ]),
-            Func::Asin ([a   ]) => translate_fun!(self, reg_base_opt, Stmt::Asin,  [a   ]),
-            Func::Ceil ([a   ]) => translate_fun!(self, reg_base_opt, Stmt::Ceil,  [a   ]),
-            Func::Cos  ([a   ]) => translate_fun!(self, reg_base_opt, Stmt::Cos,   [a   ]),
-            Func::Exp  ([a   ]) => translate_fun!(self, reg_base_opt, Stmt::Exp,   [a   ]),
-            Func::Floor([a   ]) => translate_fun!(self, reg_base_opt, Stmt::Floor, [a   ]),
-            Func::Log  ([a   ]) => translate_fun!(self, reg_base_opt, Stmt::Log,   [a   ]),
-            Func::Max  ([a, b]) => translate_fun!(self, reg_base_opt, Stmt::Max,   [a, b]),
-            Func::Min  ([a, b]) => translate_fun!(self, reg_base_opt, Stmt::Min,   [a, b]),
-            Func::Rand ([    ]) => translate_fun!(self, reg_base_opt, Stmt::Rand,  [    ]),
-            Func::Round([a   ]) => translate_fun!(self, reg_base_opt, Stmt::Round, [a   ]),
-            Func::Sin  ([a   ]) => translate_fun!(self, reg_base_opt, Stmt::Sin,   [a   ]),
-            Func::Sqrt ([a   ]) => translate_fun!(self, reg_base_opt, Stmt::Sqrt,  [a   ]),
-            Func::Tan  ([a   ]) => translate_fun!(self, reg_base_opt, Stmt::Tan,   [a   ]),
-            Func::Trunc([a   ]) => translate_fun!(self, reg_base_opt, Stmt::Trunc, [a   ]),
-            Func::Peek ([    ]) => translate_fun!(self, reg_base_opt, Stmt::Peek,  [    ]),
-            Func::Pop  ([    ]) => translate_fun!(self, reg_base_opt, Stmt::Pop,   [    ]),
+            Func::Dns  ([d   ]) => translate_fun!(self, reg_base_opt, [d   ], Stmt::Sdns),
+            Func::Dse  ([d   ]) => translate_fun!(self, reg_base_opt, [d   ], Stmt::Sdse),
+            Func::Abs  ([a   ]) => translate_fun!(self, reg_base_opt, [a   ], Stmt::Abs),
+            Func::Acos ([a   ]) => translate_fun!(self, reg_base_opt, [a   ], Stmt::Acos),
+            Func::Asin ([a   ]) => translate_fun!(self, reg_base_opt, [a   ], Stmt::Asin),
+            Func::Ceil ([a   ]) => translate_fun!(self, reg_base_opt, [a   ], Stmt::Ceil),
+            Func::Cos  ([a   ]) => translate_fun!(self, reg_base_opt, [a   ], Stmt::Cos),
+            Func::Exp  ([a   ]) => translate_fun!(self, reg_base_opt, [a   ], Stmt::Exp),
+            Func::Floor([a   ]) => translate_fun!(self, reg_base_opt, [a   ], Stmt::Floor),
+            Func::Log  ([a, b]) => {
+                let reg_base = self.unwrap_reg_base(reg_base_opt);
+                let r = Arg::Reg(Reg::Base(reg_base));
+                let (a, a_stmts) = self.translate_arg(a).unwrap();
+                let (b, b_stmts) = self.translate_arg(b).unwrap();
+                let log_stmts = vec![
+                    Stmt::Log([r.clone(), a]),
+                    Stmt::Log([r.clone(), b]),
+                    Stmt::Div([r.clone(), r.clone(), r.clone()]),
+                ];
+                let stmts = a_stmts
+                    .into_iter()
+                    .chain(b_stmts.into_iter())
+                    .chain(log_stmts.into_iter())
+                    .collect();
+                Ok((reg_base.into(), stmts))
+            },
+            Func::Ln   ([a   ]) => translate_fun!(self, reg_base_opt, [a   ], Stmt::Log),
+            Func::Max  ([a, b]) => translate_fun!(self, reg_base_opt, [a, b], Stmt::Max),
+            Func::Min  ([a, b]) => translate_fun!(self, reg_base_opt, [a, b], Stmt::Min),
+            Func::Rand ([    ]) => translate_fun!(self, reg_base_opt, [    ], Stmt::Rand),
+            Func::Round([a   ]) => translate_fun!(self, reg_base_opt, [a   ], Stmt::Round),
+            Func::Sin  ([a   ]) => translate_fun!(self, reg_base_opt, [a   ], Stmt::Sin),
+            Func::Sqrt ([a   ]) => translate_fun!(self, reg_base_opt, [a   ], Stmt::Sqrt),
+            Func::Tan  ([a   ]) => translate_fun!(self, reg_base_opt, [a   ], Stmt::Tan),
+            Func::Trunc([a   ]) => translate_fun!(self, reg_base_opt, [a   ], Stmt::Trunc),
+            Func::Peek ([    ]) => translate_fun!(self, reg_base_opt, [    ], Stmt::Peek),
+            Func::Pop  ([    ]) => translate_fun!(self, reg_base_opt, [    ], Stmt::Pop),
         }
     }
 
@@ -1135,7 +1042,7 @@ fn main() {
     let myps_src = std::fs::read_to_string(myps_path).unwrap();
 
     let program_item = myps::lexer::lex_str(&myps_src).unwrap();
-    println!("{:#?}", program_item);
+    // println!("{:#?}", program_item);
 
     // println!("{:#?}", program_item);
 
@@ -1162,7 +1069,9 @@ fn main() {
         println!("{:>w$}: {}", i, line, w = w);
     }
     println!("{}", mips.interference_graph());
-    // println!("{:#?}", mips.analyze_lifetimes());
+    for (i, (index, (s, e))) in mips.analyze_lifetimes().iter().enumerate() {
+        println!("{}: {} ({},{})", i, index, s, e);
+    }
     // println!("SCOPES {:?}", mips.scopes);
 
     println!("================================================================================");
@@ -1205,7 +1114,9 @@ fn main() {
     for (i, line) in mips.lines.iter().enumerate() {
         println!("{:>w$}: {}", i, line, w = w);
     }
-    // println!("{}", mips.interference_graph());
-    // println!("{:#?}", mips.analyze_lifetimes());
+    println!("{}", mips.interference_graph());
+    for (i, (index, (s, e))) in mips.analyze_lifetimes().iter().enumerate() {
+        println!("{}: {} ({},{})", i, index, s, e);
+    }
     // println!("SCOPES {:?}", mips.scopes);
 }

@@ -570,6 +570,14 @@ impl Mips {
         //     res.push(lifetime);
         // }
 
+        let scope_tuple = |i, fix_mode| {
+            match fix_mode {
+                FixMode::None => (i, i),
+                FixMode::Fixed => (0, self.lines.len() - 1),
+                FixMode::Scoped(s, e) => (s, e),
+            }
+        };
+
         for (i, line) in self.lines.iter().enumerate()
         // NOTE: What was this filter for?
         // .filter(|(_, line)| !matches!(line.stmt, Stmt::Alias(..)))
@@ -584,21 +592,45 @@ impl Mips {
                     index, fix_mode, ..
                 } = reg_lit;
                 if matches!(arg, Arg::Reg(..)) {
-                    let (lifetime, _replace) = match fix_mode {
-                        FixMode::None => ((i, i), true),
-                        FixMode::Fixed => ((0, self.lines.len() - 1), false),
-                        FixMode::Scoped(s, e) => ((s, e), false),
-                    };
+                    match fix_mode {
+                        FixMode::None => {
+                            let scope = scope_tuple(i, fix_mode);
+                            if let Some(old_lifetime) = lifetimes.insert(index, scope) {
+                                res.push((index, old_lifetime));
+                            }
+                        }
+                        FixMode::Fixed | FixMode::Scoped(..) => {
+                            let (s, e) = scope_tuple(i, fix_mode);
+                            if let Some((s_old, e_old)) = lifetimes.get_mut(&index) {
+                                *s_old = s.min(*s_old);
+                                *e_old = e.max(*e_old);
+                            } else {
+                                lifetimes.insert(index, (s, e));
+                            }
+                        }
+                    }
+                    // let ((s, e), replace) = match fix_mode {
+                    //     FixMode::None => ((i, i), true),
+                    //     FixMode::Fixed => ((0, self.lines.len() - 1), false),
+                    //     FixMode::Scoped(s, e) => ((s, e), false),
+                    // };
+                    // // If the register if fixed or scoped (scoped being stronger than fixed),
+                    // // then an existing entry is not replaced; else unfixed, and an existing
+                    // // entry should be replaced. (There shouldn't ever be a time where a smaller
+                    // // scoped register comes before a larger scoped one of the same index.)
                     // if replace {
-                    //     if let Some(old_lifetime) = lifetimes.insert(index, lifetime) {
+                    //     if let Some(old_lifetime) = lifetimes.insert(index, (s, e, fix_mode)) {
                     //         res.push((index, old_lifetime));
                     //     }
                     // } else {
-                    //     lifetimes.try_insert(index, lifetime).ok();
+                    //     if let Some((s_old, e_old, _)) = lifetimes.get_mut(&index) {
+                    //         *s_old = s.min(*s_old);
+                    //         *e_old = e.max(*e_old);
+                    //     } else {
+                    //         lifetimes.insert(index, (s, e, fix_mode));
+                    //     }
+                    //     // lifetimes.try_insert(index, lifetime).ok();
                     // }
-                    if let Some(old_lifetime) = lifetimes.insert(index, lifetime) {
-                        res.push((index, old_lifetime));
-                    }
                 } else {
                     // As r-value
                     let (_s, e) = lifetimes.entry(index).or_insert((i, i));
