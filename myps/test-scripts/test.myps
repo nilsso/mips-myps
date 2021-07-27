@@ -1,6 +1,9 @@
-fix a = 1
-tag test:
-    fix b = a
-    fix c = a + b
-fix b = a
-fix c = a + b
+pipe = d0
+
+def heaterHash = 123
+
+fix desiredTemp
+
+loop:
+    yield()
+    heaterHash.all.On = (desiredTemp - pipe.Temperature) > 10
