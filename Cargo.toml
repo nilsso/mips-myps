@@ -5,7 +5,6 @@ members = [
     "./mips",
     "./myps",
     "./translator",
-    "./app",
 ]
 
 [profile.release]

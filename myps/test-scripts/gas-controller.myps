@@ -1,9 +1,12 @@
+# write to db.Setting to set the target mole difference
+
 tank = d0
 pump = d1
 pidController = d2
 startSrc = d3
-targetSrc = d4
-volumeSrc = d5
+rDest = d4
+yDest
+factorSrc = d5
 
 def tankVolume = 6000
 
