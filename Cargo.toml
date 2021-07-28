@@ -5,11 +5,4 @@ members = [
     "./mips",
     "./myps",
     "./translator",
-    "./app",
 ]
-
-[profile.release]
-lto = true
-
-# [target."cfg(debug_assertions)".dependencies]
-# console_error_panic_hook = "*"
