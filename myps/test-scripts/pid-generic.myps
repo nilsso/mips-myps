@@ -1,0 +1,42 @@
+
+feedback = d0
+target = d1
+clear = d2
+kP = d3
+kI = d4
+kD = d5
+
+r = target.Setting
+fix f, last_error
+
+while s < r:
+    s = feedback.Setting
+    
+    error = r - s
+
+
+
+    error = = self.SetPoint - feedback_value
+        self.current_time = current_time if current_time is not None else time.time()
+        delta_time = self.current_time - self.last_time
+        delta_error = error - self.last_error
+        if (delta_time >= self.sample_time):
+            self.PTerm = self.Kp * error
+            self.ITerm += error * delta_time
+
+            if (self.ITerm < -self.windup_guard):
+                self.ITerm = -self.windup_guard
+            elif (self.ITerm > self.windup_guard):
+                self.ITerm = self.windup_guard
+
+            self.DTerm = 0.0
+            if delta_time > 0:
+                self.DTerm = delta_error / delta_time
+
+            # Remember last time and last error for next calculation
+            self.last_time = self.current_time
+            self.last_error = error
+
+            self.output = self.PTerm + (self.Ki * self.ITerm) + (self.Kd * self.DTerm)
+
+

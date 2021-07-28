@@ -1,3 +1,2 @@
-fix a = 1
-fix b = a
-fix c = a + b
+if 1 == 1:
+    a = 1
