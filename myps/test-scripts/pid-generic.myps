@@ -1,42 +1,24 @@
+feedbackSrc = d0
+targetSrc = d1
+clearSrc = d2
+kPSrc = d3
+kISrc = d4
+kDSrc = d5
 
-feedback = d0
-target = d1
-clear = d2
-kP = d3
-kI = d4
-kD = d5
+fix kP = kPSrc.Setting # kP
+fix kI = kISrc.Setting # kI
+fix kD = kDSrc.Setting # kD
 
-r = target.Setting
-fix f, last_error
+def dt = 0.5 # dT
+fix target = targetSrc.Setting # target
+fix feedback, I, lastError
 
-while s < r:
-    s = feedback.Setting
-    
-    error = r - s
-
-
-
-    error = = self.SetPoint - feedback_value
-        self.current_time = current_time if current_time is not None else time.time()
-        delta_time = self.current_time - self.last_time
-        delta_error = error - self.last_error
-        if (delta_time >= self.sample_time):
-            self.PTerm = self.Kp * error
-            self.ITerm += error * delta_time
-
-            if (self.ITerm < -self.windup_guard):
-                self.ITerm = -self.windup_guard
-            elif (self.ITerm > self.windup_guard):
-                self.ITerm = self.windup_guard
-
-            self.DTerm = 0.0
-            if delta_time > 0:
-                self.DTerm = delta_error / delta_time
-
-            # Remember last time and last error for next calculation
-            self.last_time = self.current_time
-            self.last_error = error
-
-            self.output = self.PTerm + (self.Ki * self.ITerm) + (self.Kd * self.DTerm)
-
-
+while feedback  < target:
+    yield()
+    feedback  = feedbackSrc.Setting
+    error = target - feedback
+    P = kP * error # P = kP * error
+    I += error * dt # I += error * dt
+    D = (error - lastError) / dt # D = (error - lastError) / dt
+    output = P + (kI * I) + (kD * D) # output = P+(kI*I)+(kd*D)
+    db.Setting = output

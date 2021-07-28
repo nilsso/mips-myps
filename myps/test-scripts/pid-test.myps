@@ -1,0 +1,25 @@
+tank = d0
+pump = d1
+
+def V = 8400
+def kP = 0.2
+def kI = 0.0
+def kD = 0.0
+def dt = 0.5
+def target = 100
+
+fix n0 = tank.TotalMoles
+fix feedback = 0
+fix lastError = 0
+fix I = 0
+
+loop:
+    yield()
+    feedback = n0 - tank.TotalMoles
+    error = target - feedback
+    P = kP * error
+    I += error * dt
+    D = (error - lastError) / dt
+    output = P + (kI * I) + (kD * D)
+    pump.Setting = output
+    db.Setting = output
