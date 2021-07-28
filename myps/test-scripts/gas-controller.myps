@@ -1,0 +1,37 @@
+tank = d0
+pump = d1
+pidController = d2
+startSrc = d3
+targetSrc = d4
+volumeSrc = d5
+
+def tankVolume = 6000
+
+loop:
+    yield()
+    if startSrc.Setting != 0:
+        # Calculate total moles factor
+        totalVolume = volumeSrc.Setting
+        molesFactor = totalVolume / tankVolume
+
+        # Calculate initial moles and target
+        n0 = molesFactor * tank.TotalMoles
+        target = n0 - targetSrc.Setting # target = n0-targetSrc.Setting
+        
+        # Turn on PID and pump
+        # pidController.On = 1
+        pump.Setting = 0
+        pump.On = 1
+
+        # Run until target achieved
+        fix n = n0
+        while n > target:
+            db.Setting = n
+            yield()
+            r = pidController.Setting
+            pump.Setting = r
+
+        # Turn off PID and pump
+        # pidController.On = 0
+        pump.On = 0
+    

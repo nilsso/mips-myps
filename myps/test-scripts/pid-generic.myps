@@ -1,22 +1,23 @@
 ySrc = d0 # feedback
 rSrc = d1 # target
-kPSrc = d2
-kISrc = d3
-kDSrc = d4
+cSrc = d2 # clear integral
 
-fix r, kP, kI, kD, i, rPrev, ePrev
+# EDIT THESE:
+def kP = 0.0100
+def kI = 0.0000
+def kD = 0.0015
+
+fix r, y, i, rPrev, ePrev
 def dt = 0.5
 
 loop:
     yield()
-    r  = rSrc.Setting # r (target)
-    kP = kPSrc.Setting # kP
-    kI = kISrc.Setting # kI
-    kD = kDSrc.Setting # kD
+    r = rSrc.Setting # r (target)
     y = ySrc.Setting # y (feedback)
+    c = cSrc.Setting # c (clear integral)
 
-    if r != rPrev:
-        i = 0 # reset integral
+    if c != 0:
+        i = 0
 
     e = y - r # e = y-r
     i += e * dt # i += e*dt
