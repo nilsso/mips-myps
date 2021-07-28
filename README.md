@@ -17,3 +17,59 @@ radiator array https://www.youtube.com/watch?v=ZHq20I1HJ8U&ab_channel=Elmotrix
 
 The other cool thing about GFG's is you can actually fully control how much power they output. Here is some code I wrote to control the fuel input so that the generator outputs the amount of power you want.
 https://steamcommunity.com/sharedfiles/filedetails/?id=2509117328
+
+```
+R = 8.314
+tank_V = 6000 # L
+tank_T = 273.15 # K
+tank_n0 = 10000 # moles (initial)
+tank_n = tank_n0
+
+n_moved = lambda n, r: n * r / tank_V # r: pump ratio
+
+pid = PID.PID(P, I, D)
+pid.setSampleTime(0.01)
+
+END = L
+feedback = tank_n
+target = 500
+pid.SetPoint = feedback  - target
+
+feedback_list = []
+time_list = []
+setpoint_list = []
+r_list = []
+
+for i in range(1, END):
+    pid.update(feedback)
+    
+    
+    r = max(0, min(100, -pid.output)) # pump ratio
+    dn = n_moved(tank_n, r)
+    tank_n -= dn
+    feedback = tank_n
+    r_list.append(r)
+    
+#     feedback += pid.output
+#     feedback += (pid.output - (1/i))
+
+#     output = pid.output
+#     if pid.SetPoint > 0:
+#         feedback += (output - (1/i))
+#     if i > 10:
+#         pid.SetPoint = 1
+#         pid.SetPoint = 1
+    time.sleep(0.02)
+
+    feedback_list.append(feedback)
+    setpoint_list.append(pid.SetPoint)
+    time_list.append(i)
+    
+print(r_list)
+
+time_sm = np.array(time_list)
+# feedback_smooth = interp.splprep(time_list, feedback_list, time_smooth)
+spl = interp.splrep(time_list, feedback_list)
+time_smooth = np.linspace(time_sm.min(), time_sm.max(), 300)
+feedback_smooth = interp.splev(time_smooth, spl)
+```
