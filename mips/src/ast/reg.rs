@@ -135,7 +135,7 @@ impl<'i> AstNode<'i, Rule, MipsParser, MipsError> for RegBase {
                     "sp" => Ok(Self::SP),
                     "ra" => Ok(Self::RA),
                     _ => {
-                        let mut reg_lit = pair.try_into_ast()?;
+                        let reg_lit = pair.try_into_ast()?;
                         Ok(Self::Lit(reg_lit))
                     },
                 }

@@ -10,27 +10,24 @@ fix dawnAngle, lastOn, h, v
 
 loop: # loop:
     yield()
-    h = sensor.Horizontal # h = sensor.Horizontal
+    db.Setting = dawnAngle
     on = sensor.On # on = sensor.On
-    if on: # if on:
+    if on != 0: # if on:
+        h = sensor.Horizontal + (offsetDial.Setting * 90) # h = h + (offsetDial.Setting * 90)
+        v = (75 - sensor.Vertical) / 1.5 # v = (75 - sensor.Vertical) / 1.5
         if lastOn != on: # if lastOn != on:
             dawnAngle = h # dawnAngle = h
-        h = h + (offsetDial.Setting * 90) # h = h + (offsetDial.Setting * 90)
-        v = (75 - sensor.Vertical) / 1.5 # v = (75 - sensor.Vertical) / 1.5
-        jal(writeAngles)
     else: # else:
         h = dawnAngle # h = dawnAngle
         v = 0 # v = 0
-        jal(writeAngles)
     lastOn = on # lastOn = on
-tag writeAngles:
-    Normal    .all.Horizontal = h
-    NormalDual.all.Horizontal = h
-    Heavy     .all.Horizontal = h
-    HeavyDual .all.Horizontal = h
-    Normal    .all.Vartical   = v
-    NormalDual.all.Vartical   = v
-    Heavy     .all.Vartical   = v
-    HeavyDual .all.Vartical   = v
-    j(ra)
+    tag writeAngles:
+        Normal    .all.Horizontal = h
+        NormalDual.all.Horizontal = h
+        Heavy     .all.Horizontal = h
+        HeavyDual .all.Horizontal = h
+        Normal    .all.Vertical   = v
+        NormalDual.all.Vertical   = v
+        Heavy     .all.Vertical   = v
+        HeavyDual .all.Vertical   = v
     

@@ -228,6 +228,7 @@ impl Translator {
                 // Having a statement on the stack means that the register of this last statement
                 // is being thrown out, and so we need to decrement next_index.
                 translator.next_index -= 1;
+                println!("{:?}", cond_stmt);
                 let cond_stmt = match cond_stmt {
                     Stmt::Sap (..)        => unimplemented!(),
                     Stmt::Sapz(..)        => unimplemented!(),
@@ -774,12 +775,46 @@ impl Translator {
                     BinaryOp::Or  => vec![Stmt::Or ([r, a, b])],
                     BinaryOp::Xor => vec![Stmt::Xor([r, a, b])],
                     // Relational
-                    BinaryOp::Eq  => vec![Stmt::Seq([r, a, b])],
+                    BinaryOp::Eq  => {
+                        #[rustfmt::skip]
+                        #[allow(illegal_floating_point_literal_pattern)]
+                        match (&a, &b) {
+                            (Arg::Num(Num::Lit(0.0)), Arg::Num(Num::Lit(0.0))) => {
+                                unimplemented!()
+                            },
+                            (_,                       Arg::Num(Num::Lit(0.0))) => {
+                                vec![Stmt::Seqz([r, a])]
+                            },
+                            (Arg::Num(Num::Lit(0.0)), _                      ) => {
+                                vec![Stmt::Seqz([r, b])]
+                            },
+                            _ => {
+                                vec![Stmt::Seq([r, a, b])]
+                            },
+                        }
+                    },
                     BinaryOp::Ge  => vec![Stmt::Sge([r, a, b])],
                     BinaryOp::Gt  => vec![Stmt::Sgt([r, a, b])],
                     BinaryOp::Lt  => vec![Stmt::Slt([r, a, b])],
                     BinaryOp::Le  => vec![Stmt::Sle([r, a, b])],
-                    BinaryOp::Ne  => vec![Stmt::Sne([r, a, b])],
+                    BinaryOp::Ne  => {
+                        #[rustfmt::skip]
+                        #[allow(illegal_floating_point_literal_pattern)]
+                        match (&a, &b) {
+                            (Arg::Num(Num::Lit(0.0)), Arg::Num(Num::Lit(0.0))) => {
+                                unimplemented!()
+                            },
+                            (_,                       Arg::Num(Num::Lit(0.0))) => {
+                                vec![Stmt::Snez([r, a])]
+                            },
+                            (Arg::Num(Num::Lit(0.0)), _                      ) => {
+                                vec![Stmt::Snez([r, b])]
+                            },
+                            _ => {
+                                vec![Stmt::Sne([r, a, b])]
+                            },
+                        }
+                    },
                 };
                 let stmts = a_stmts
                     .into_iter()
@@ -1039,9 +1074,7 @@ fn main() {
     use mips::{Mips, OptimizationConfig};
 
     let myps_path = std::env::args().skip(1).next().unwrap();
-    let myps_src = std::fs::read_to_string(myps_path).unwrap();
-
-    let program_item = myps::lexer::lex_str(&myps_src).unwrap();
+    let program_item = myps::lexer::lex_file(&myps_path).unwrap();
     // println!("{:#?}", program_item);
 
     // println!("{:#?}", program_item);
@@ -1053,29 +1086,29 @@ fn main() {
     // for (i, line) in lines.iter().enumerate() {
     //     println!("{:>w$}: {:?}", i, line, w = w);
     // }
-    for (i, line) in lines.iter().enumerate() {
-        println!("{:>w$}: {}", i, line, w = w);
-    }
+    // for (i, line) in lines.iter().enumerate() {
+    //     println!("{:>w$}: {}", i, line, w = w);
+    // }
     // println!("{:#?}", scopes);
 
-    println!("================================================================================");
+    // println!("================================================================================");
     let mips = Mips::default_with_lines(lines).unwrap();
-    let w = (mips.lines.len() as f64 - 1.0).log10().floor().max(0_f64) as usize + 1;
-    for (i, line) in mips.lines.iter().enumerate() {
-        println!("{:>w$}: {:?}", i, line, w = w);
-    }
-    println!("--------------------------------------------------------------------------------");
-    for (i, line) in mips.lines.iter().enumerate() {
-        println!("{:>w$}: {}", i, line, w = w);
-    }
-    println!("{}", mips.interference_graph());
-    for (i, (index, (s, e))) in mips.analyze_lifetimes().iter().enumerate() {
-        println!("{}: {} ({},{})", i, index, s, e);
-    }
+    // let w = (mips.lines.len() as f64 - 1.0).log10().floor().max(0_f64) as usize + 1;
+    // for (i, line) in mips.lines.iter().enumerate() {
+    //     println!("{:>w$}: {:?}", i, line, w = w);
+    // }
+    // println!("--------------------------------------------------------------------------------");
+    // for (i, line) in mips.lines.iter().enumerate() {
+    //     println!("{:>w$}: {}", i, line, w = w);
+    // }
+    // println!("{}", mips.interference_graph());
+    // for (i, (index, (s, e))) in mips.analyze_lifetimes().iter().enumerate() {
+    //     println!("{}: {} ({},{})", i, index, s, e);
+    // }
     // println!("SCOPES {:?}", mips.scopes);
 
-    println!("================================================================================");
-    println!("OPTIMIZE");
+    // println!("================================================================================");
+    // println!("OPTIMIZE");
     #[rustfmt::skip]
         let mips = mips
             .optimize(OptimizationConfig {
@@ -1106,17 +1139,20 @@ fn main() {
             )
             .unwrap();
 
-    let w = (mips.lines.len() as f64 - 1.0).log10().floor().max(0_f64) as usize + 1;
-    for (i, line) in mips.lines.iter().enumerate() {
-        println!("{:>w$}: {:?}", i, line, w = w);
+    // let w = (mips.lines.len() as f64 - 1.0).log10().floor().max(0_f64) as usize + 1;
+    // for (i, line) in mips.lines.iter().enumerate() {
+    //     println!("{:>w$}: {:?}", i, line, w = w);
+    // }
+    // println!("--------------------------------------------------------------------------------");
+    // for (i, line) in mips.lines.iter().enumerate() {
+    //     println!("{:>w$}: {}", i, line, w = w);
+    // }
+    for line in mips.lines.iter() {
+        println!("{}", line);
     }
-    println!("--------------------------------------------------------------------------------");
-    for (i, line) in mips.lines.iter().enumerate() {
-        println!("{:>w$}: {}", i, line, w = w);
-    }
-    println!("{}", mips.interference_graph());
-    for (i, (index, (s, e))) in mips.analyze_lifetimes().iter().enumerate() {
-        println!("{}: {} ({},{})", i, index, s, e);
-    }
+    // println!("{}", mips.interference_graph());
+    // for (i, (index, (s, e))) in mips.analyze_lifetimes().iter().enumerate() {
+    //     println!("{}: {} ({},{})", i, index, s, e);
+    // }
     // println!("SCOPES {:?}", mips.scopes);
 }
