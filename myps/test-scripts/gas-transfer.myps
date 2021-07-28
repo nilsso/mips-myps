@@ -1,0 +1,41 @@
+tank = d0
+pump = d1
+startSrc = d2
+targetSrc = d3
+factorSrc = d4
+
+def kP = 0.06
+def kI = 0.00
+def kD = 0.02
+def dt = 0.5
+
+fix f, r, n, e, ePrev
+
+loop:
+    yield()
+    db.Setting = 0
+    if startSrc.Setting != 0:
+        f = factorSrc.Setting
+        n = f * tank.TotalMoles
+        r = n - targetSrc.Setting
+        e = n - r
+        ePrev = 0
+
+        pump.Setting = 0
+        pump.On = 1
+
+        while e > 0.1:
+            e = n - r
+            P = kP * e
+            D = kD * (e - ePrev) / dt
+            u = P + D
+
+            pump.Setting = u
+            db.Setting = e
+
+            ePrev = e
+
+            yield()
+            n = f * tank.TotalMoles
+
+        pump.On = 0
