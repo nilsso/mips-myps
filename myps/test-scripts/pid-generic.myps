@@ -1,24 +1,30 @@
-feedbackSrc = d0
-targetSrc = d1
-clearSrc = d2
-kPSrc = d3
-kISrc = d4
-kDSrc = d5
+ySrc = d0 # feedback
+rSrc = d1 # target
+kPSrc = d2
+kISrc = d3
+kDSrc = d4
 
-fix kP = kPSrc.Setting # kP
-fix kI = kISrc.Setting # kI
-fix kD = kDSrc.Setting # kD
+fix r, kP, kI, kD, i, rPrev, ePrev
+def dt = 0.5
 
-def dt = 0.5 # dT
-fix target = targetSrc.Setting # target
-fix feedback, I, lastError
-
-while feedback  < target:
+loop:
     yield()
-    feedback  = feedbackSrc.Setting
-    error = target - feedback
-    P = kP * error # P = kP * error
-    I += error * dt # I += error * dt
-    D = (error - lastError) / dt # D = (error - lastError) / dt
-    output = P + (kI * I) + (kD * D) # output = P+(kI*I)+(kd*D)
-    db.Setting = output
+    r  = rSrc.Setting # r (target)
+    kP = kPSrc.Setting # kP
+    kI = kISrc.Setting # kI
+    kD = kDSrc.Setting # kD
+    y = ySrc.Setting # y (feedback)
+
+    if r != rPrev:
+        i = 0 # reset integral
+
+    e = y - r # e = y-r
+    i += e * dt # i += e*dt
+    P = kP * e # P = kP*e
+    I = kI * i # I = kI*i
+    D = kD * (e - ePrev) / dt # D = kD*(e-ePrev)/dt
+    u = P + I + D # u = P+I+D (the control variable)
+
+    db.Setting = u
+    rPrev = r # rPrev = r
+    ePrev = e # ePrev = e

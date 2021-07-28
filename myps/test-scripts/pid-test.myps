@@ -1,29 +1,29 @@
-        tank = d0
-        pump = d1
+tank = d0
+pump = d1
 
-         # TODO: vars in defines
-        #def V = 6400
-        def VScale = 6400/6000 # scale tank vol to system vol
+ # TODO: vars in defines
+#def V = 6400
+def VScale = 6400/6000 # scale tank vol to system vol
 
-        def kP = 10.0
-        def kI = 0.0
-        def kD = 1.5
-        def dt = 0.5
-        def target = 2000
+def kP = 10.0 / 100
+def kI = 0.0
+def kD = 1.5 / 100
+def dt = 0.5
+def target = 2000
 
-        fix n0 = VScale*tank.TotalMoles
-        fix feedback = 0
-        fix prevError = 0
-        fix IRunning = 0
+fix n0 = VScale*tank.TotalMoles
+fix feedback = 0
+fix prevError = 0
+fix IRunning = 0
 
-        loop:
-            yield()
-            feedback = n0 - VScale * tank.TotalMoles
-            error = target - feedback
-            IRunning += error * dt
-            P = kP * error # P = kP*error
-            I = kI * IRunning # I = kI*IRunning
-            D = kD * (error - prevError) / dt # D = kD*(error-prevError)/dt
-            control = (P + I + D) / 100 # (scale for volume pump)
-            prevError = error # prevError = error
-            pump.Setting = control / 100
+loop:
+    yield()
+    feedback = n0 - VScale * tank.TotalMoles
+    error = target - feedback
+    IRunning += error * dt
+    P = kP * error # P = kP*error
+    I = kI * IRunning # I = kI*IRunning
+    D = kD * (error - prevError) / dt # D = kD*(error-prevError)/dt
+    control = (P + I + D) # (scale for volume pump)
+    prevError = error # prevError = error
+    pump.Setting = control
