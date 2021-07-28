@@ -1,9 +1,2 @@
-pipe = d0
-
-def heaterHash = 123
-
-fix desiredTemp
-
-loop:
-    yield()
-    heaterHash.all.On = (desiredTemp - pipe.Temperature) > 10
+if 1 == 1:
+    a = 1
