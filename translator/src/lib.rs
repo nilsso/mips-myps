@@ -233,7 +233,19 @@ impl Translator {
                     Stmt::Sapz(..)        => unimplemented!(),
                     Stmt::Sdns([_, d,  ]) => Stmt::Brdse([d,    c]),
                     Stmt::Sdse([_, d,  ]) => Stmt::Brdns([d,    c]),
-                    Stmt::Seq ([_, a, b]) => Stmt::Brne ([a, b, c]),
+                    Stmt::Seq ([_, a, b]) => {
+                        match (&a, &b) {
+                            (_, Arg::Num(Num::Lit(b))) if b.abs() < f64::EPSILON => {
+                                Stmt::Brnez ([a, c])
+                            },
+                            (Arg::Num(Num::Lit(a)), _) if a.abs() < f64::EPSILON => {
+                                Stmt::Brnez ([b, c])
+                            },
+                            _ => {
+                                Stmt::Brne ([a, b, c])
+                            },
+                        }
+                    },
                     Stmt::Seqz([_, a   ]) => Stmt::Brnez([a,    c]),
                     Stmt::Sge ([_, a, b]) => Stmt::Brlt ([a, b, c]),
                     Stmt::Sgez([_, a   ]) => Stmt::Brltz([a,    c]),

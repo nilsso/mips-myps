@@ -5,9 +5,7 @@ fn main() {
 
     let myps_path = std::env::args().skip(1).next().unwrap();
     let program_item = myps::lexer::lex_file(&myps_path).unwrap();
-    // println!("{:#?}", program_item);
-
-    // println!("{:#?}", program_item);
+    println!("{:#?}", program_item);
 
     // println!("================================================================================");
     let mut translator = Translator::default();
