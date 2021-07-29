@@ -5,7 +5,7 @@ fn main() {
 
     let myps_path = std::env::args().skip(1).next().unwrap();
     let program_item = myps::lexer::lex_file(&myps_path).unwrap();
-    println!("{:#?}", program_item);
+    // println!("{:#?}", program_item);
 
     // println!("================================================================================");
     let mut translator = Translator::default();
@@ -73,8 +73,8 @@ fn main() {
     }
     println!("--------------------------------------------------------------------------------");
     for (_i, line) in mips.lines.iter().enumerate() {
-        println!("{:>w$}: {}", _i, line, w = w);
-        // println!("{}", line);
+        // println!("{:>w$}: {}", _i, line, w = w);
+        println!("{}", line);
     }
     // println!("{}", mips.interference_graph());
     // for (i, (index, (s, e))) in mips.analyze_lifetimes().iter().enumerate() {

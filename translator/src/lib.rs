@@ -255,12 +255,12 @@ impl Translator {
                     Stmt::Snez([_, a])    => Stmt::Breqz([a,    c]),
                     _ => {
                         cond_stmts.push(cond_stmt);
-                        Stmt::Brnez([cond_num.into(), c])
+                        Stmt::Breqz([cond_num.into(), c])
                     },
                 };
                 cond_stmts.push(cond_stmt);
             } else {
-                let cond_stmt = Stmt::Brnez([cond_num.into(), c]);
+                let cond_stmt = Stmt::Breqz([cond_num.into(), c]);
                 cond_stmts.push(cond_stmt);
             }
             cond_stmts
@@ -379,6 +379,8 @@ impl Translator {
                 shift_scopes(&mut body_lines, cond_stmts.len());
                 // Push backwards jump
                 body_lines.push({
+                    println!("BODY_LINES {} {:?}", body_lines.len(), body_lines);
+                    println!("COND_STMTS {} {:?}", cond_stmts.len(), cond_stmts);
                     let jump_by = -((body_lines.len() + cond_stmts.len()) as i64);
                     let jump_back = Arg::LineRel(jump_by.into());
                     let stmt = Stmt::Jr([jump_back]);
