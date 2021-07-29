@@ -1,10 +1,38 @@
 furnace = d0
-sourceC = d1
-sourceH = d2
-nCmem = d3
-nHmem = d4
+tankC = d1
+tankH = d2
+tTSrc = d
+pTSrc = d
+nCDest = d3
+nHDest = d4
+startSrc = d5
 
-def vF = 1000
+furnace = d
+tankSrc = d
+targetSrc = d
+outputDest = d
+
+tankC = d
+tankH = d
+tTSrc = d
+pTSrc = d
+nCDest = d
+nHDest = d
+
+# when not running:
+# - nCDest and nHDest Setting = -1 (signals to controllers to not be running)
+#
+# when started:
+# - batch read temperature and pressure from furnace (tF/pF),
+# - read tank temperatures (tC/tH),
+# - read targets (tT/pT),
+# - calculate moles to remove and add from C and H (nR/nC/nH)
+# - write nC to nCDest, nH to nHDest (which will start controllers),
+# - start removing nR moles from the furnace; once finished
+# - input the nC and nH gas (can the necessary run time be calculated?)
+# - enjoy
+
+def vF = 6000
 def R = 8.314
 
 fix tT = 1000
