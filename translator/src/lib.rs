@@ -245,7 +245,19 @@ impl Translator {
                     Stmt::Sltz([_, a   ]) => Stmt::Brgez([a,    c]),
                     Stmt::Sna (..)        => unimplemented!(),
                     Stmt::Snaz(..)        => unimplemented!(),
-                    Stmt::Sne ([_, a, b]) => Stmt::Breq ([a, b, c]),
+                    Stmt::Sne ([_, a, b]) => {
+                        match (&a, &b) {
+                            (_, Arg::Num(Num::Lit(b))) if b.abs() < f64::EPSILON => {
+                                Stmt::Breqz ([a, c])
+                            },
+                            (Arg::Num(Num::Lit(a)), _) if a.abs() < f64::EPSILON => {
+                                Stmt::Breqz ([b, c])
+                            },
+                            _ => {
+                                Stmt::Breq ([a, b, c])
+                            },
+                        }
+                    },
                     Stmt::Snez([_, a])    => Stmt::Breqz([a,    c]),
                     _ => {
                         cond_stmts.push(cond_stmt);
@@ -302,7 +314,7 @@ impl Translator {
                     body_lines.push(Line::new_no_comment(Stmt::J([tag])));
                 }
                 // Update condition branch jump
-                let jump_by = (cond_stmts.len() + body_lines.len()) as i64;
+                let jump_by = (body_lines.len() + 1) as i64;
                 let jump_f = Arg::LineRel(jump_by.into());
                 update_branch(&mut cond_stmts, jump_f);
                 let cond_lines = cond_stmts
@@ -340,7 +352,8 @@ impl Translator {
                 };
                 body_lines.push(Line::new_no_comment(chain_stmt));
                 // Update condition branch jump
-                let jump_f = Arg::LineRel((body_lines.len() as i64 + 1).into());
+                let jump_by = (body_lines.len() + 1) as i64;
+                let jump_f = Arg::LineRel(jump_by.into());
                 update_branch(&mut cond_stmts, jump_f);
                 let cond_lines = cond_stmts
                     .into_iter()

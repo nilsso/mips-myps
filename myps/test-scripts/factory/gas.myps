@@ -5,12 +5,9 @@ pTSrc = d3
 nCPump = d4
 nHPump = d5
 
-def IDLE = 0
-def RUN = 1
-
 def PipeAnalyzer = 435685051
 def AdvFurnace = 545937711
-def vF = 6000
+def vF = 1000
 def R = 8.314
 
 def vCFactor = 6100 / 6000
@@ -18,78 +15,90 @@ def vHFactor = 6100 / 6000
 
 loop:
     yield()
-    signal = db.Setting
-    if signal == RUN:
+    if db.Setting != 0:
         # (a) batch read temperature and pressure from furnace (tF/pF)
+        db.Setting = 2
+        fix nF = AdvFurnace.all.TotalMoles.avg
         tF = AdvFurnace.all.Temperature.avg
         pF = AdvFurnace.all.Pressure.avg
-        nF = AdvFurnace.all.TotalMoles.avg
 
         # (b) read tank temperatures
+        db.Setting = 3
         tC = tankC.Temperature
         tH = tankH.Temperature
 
         # (c) read targets (tT/pT),
+        db.Setting = 4
         tT = tTSrc.Setting
         pT = pTSrc.Setting
 
         # (d) calculate moles to remove and add from C and H (nR/nC/nH)
-        nT = pT*vF/(R*tT)
-        tTnT = tT*nT
-        nRC = (tTnT-tH*nT)/(tH-tF)+nF
-        nRH = (tTnT-tC*nT)/(tC-tF)+nF
-        nR = max(0, max(nRC, nRH))
-        nD = nF-nR
-        nI = nT-nD
-        tI = (tTnT-tF*nD)/nI
-        nHI = (nI*(tC-tI))/(tC-tH)
-        nCI = nI-nHI
+        db.Setting = 5
+        tag partD:
+            nT = pT*vF/(R*tT)
+            tTnT = tT*nT
+            nRC = (tTnT-tH*nT)/(tH-tF)+nF
+            nRH = (tTnT-tC*nT)/(tC-tF)+nF
+            nR = max(0, max(nRC, nRH))
+            nD = nF-nR
+            nI = nT-nD
+            tI = (tTnT-tF*nD)/nI
+            nHI = (nI*(tC-tI))/(tC-tH) # nHI
+            nCI = nI-nHI # nCI
 
         # (e) remove nR, mix nC and nH
-        def kP = 0.06
-        def kD = 0.02
-        def dt = 0.5
+        db.Setting = 6
+        tag parthE:
+            def kP = 0.06
+            def kD = 0.02
+            def dt = 0.5
 
-        fix nC = vCFactor * tankC.TotalMoles # calc C moles
-        fix nH = vHFactor * tankH.TotalMoles # calc H moles
+            fix nC = vCFactor * tankC.TotalMoles # calc C moles
+            fix nH = vHFactor * tankH.TotalMoles # calc H moles
 
-        rF = nF - nR # calc F target
-        rC = nC - nCI # calc C target
-        rH = nH - nHI # calc H target
-
-        yield()
-        nCPump.On = 1
-        nHPump.On = 1
-        fix eF = nF - rF
-        fix eC = nC - rC
-        fix eH = nH - rH
-        fix eFPrev = 0
-        fix eCPrev = 0
-        fix eHPrev = 0
-        while eF > 0.1 or eC > 0.1 or eH > 0.1:
-            uF = (kP * eF) + (kD * (eF - eFPrev) / dt)
-            AdvFurnace.all.SettingOutput = uF
-
-            uC = (kP * eC) + (kD * (eC - eCPrev) / dt)
-            nCPump.Setting = uC
-
-            uH = (kP * eH) + (kD * (eH - eHPrev) / dt)
-            nHPump.Setting = uH
-
-            eFPrev = eF # save F error
-            eCPrev = eC # save C error
-            eHPrev = eH # save H error
+            rF = nF - nR # calc F target (rF)
+            rC = nC - nCI # calc C target (rC
+            rH = nH - nHI # calc H target (rH)
 
             yield()
-            nF = AdvFurnace.all.TotalMoles.avg
-            nC = vCFactor * tankC.TotalMoles
-            nH = vHFactor * tankH.TotalMoles
-            eF = nF - rF
-            eC = nC - rC
-            eH = nH - rH
+            nCPump.On = 1
+            nHPump.On = 1
+            fix eF = nF - rF # fix F error (nF - rF)
+            fix eC = nC - rC # fix C error (nC - rC)
+            fix eH = nH - rH # fix H error (nH - rH)
+            fix eFPrev = 0 # fix F error (prev)
+            fix eCPrev = 0 # fix C error (prev)
+            fix eHPrev = 0 # fix H error (prev)
+            while eF > 0.1 or eC > 0.1 or eH > 0.1:
+                uF = (kP * eF) + (kD * (eF - eFPrev) / dt)
+                AdvFurnace.all.SettingOutput = uF # set furnace out
+
+                uC = (kP * eC) + (kD * (eC - eCPrev) / dt)
+                nCPump.Setting = uC # set C pump
+
+                uH = (kP * eH) + (kD * (eH - eHPrev) / dt)
+                nHPump.Setting = uH # set H pump
+
+                eFPrev = eF # save F error
+                eCPrev = eC # save C error
+                eHPrev = eH # save H error
+
+                yield()
+                nF = AdvFurnace.all.TotalMoles.avg
+                nC = vCFactor * tankC.TotalMoles
+                nH = vHFactor * tankH.TotalMoles
+                eF = nF - rF
+                eC = nC - rC
+                eH = nH - rH
+            nCPump.On = 0
+            nHPump.On = 0
 
         # (f) input the nC and nH gas (can the necessary run time be calculated?)
+        db.Setting = 7
         AdvFurnace.all.SettingInput = 100
         while PipeAnalyzer.all.TotalMoles.avg > 0:
             yield()
         AdvFurnace.all.SettingInput = 0
+
+        # (g) enjoy
+        db.Setting = 0
