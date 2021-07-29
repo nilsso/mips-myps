@@ -229,23 +229,17 @@ impl Translator {
                 // is being thrown out, and so we need to decrement next_index.
                 translator.next_index -= 1;
                 let cond_stmt = match cond_stmt {
+                    Stmt::Seq ([_, a, b]) => {
+                        unimplemented!();
+                    }
+                    _ => cond_stmt,
+                };
+                let cond_stmt = match cond_stmt {
                     Stmt::Sap (..)        => unimplemented!(),
                     Stmt::Sapz(..)        => unimplemented!(),
                     Stmt::Sdns([_, d,  ]) => Stmt::Brdse([d,    c]),
                     Stmt::Sdse([_, d,  ]) => Stmt::Brdns([d,    c]),
-                    Stmt::Seq ([_, a, b]) => {
-                        match (&a, &b) {
-                            (_, Arg::Num(Num::Lit(b))) if b.abs() < f64::EPSILON => {
-                                Stmt::Brnez ([a, c])
-                            },
-                            (Arg::Num(Num::Lit(a)), _) if a.abs() < f64::EPSILON => {
-                                Stmt::Brnez ([b, c])
-                            },
-                            _ => {
-                                Stmt::Brne ([a, b, c])
-                            },
-                        }
-                    },
+                    Stmt::Seq ([_, a, b]) => Stmt::Brne ([a, b, c]),
                     Stmt::Seqz([_, a   ]) => Stmt::Brnez([a,    c]),
                     Stmt::Sge ([_, a, b]) => Stmt::Brlt ([a, b, c]),
                     Stmt::Sgez([_, a   ]) => Stmt::Brltz([a,    c]),
@@ -257,19 +251,7 @@ impl Translator {
                     Stmt::Sltz([_, a   ]) => Stmt::Brgez([a,    c]),
                     Stmt::Sna (..)        => unimplemented!(),
                     Stmt::Snaz(..)        => unimplemented!(),
-                    Stmt::Sne ([_, a, b]) => {
-                        match (&a, &b) {
-                            (_, Arg::Num(Num::Lit(b))) if b.abs() < f64::EPSILON => {
-                                Stmt::Breqz ([a, c])
-                            },
-                            (Arg::Num(Num::Lit(a)), _) if a.abs() < f64::EPSILON => {
-                                Stmt::Breqz ([b, c])
-                            },
-                            _ => {
-                                Stmt::Breq ([a, b, c])
-                            },
-                        }
-                    },
+                    Stmt::Sne ([_, a, b]) => Stmt::Breq ([a, b, c]),
                     Stmt::Snez([_, a])    => Stmt::Breqz([a,    c]),
                     _ => {
                         cond_stmts.push(cond_stmt);
@@ -771,6 +753,23 @@ impl Translator {
             Expr::Binary { op, lhs, rhs } => {
                 use myps::ast::BinaryOp;
 
+                macro_rules! zero_variant {
+                    ($r:ident, $a:ident, $b:ident, $default:path, $bzero:path, $azero:path) => {{
+                        let r = $r;
+                        let a = $a;
+                        let b = $b;
+                        let stmt = match (&a, &b) {
+                            (_, Arg::Num(Num::Lit(b))) if b.abs() < f64::EPSILON => $bzero([r, a]),
+                            (Arg::Num(Num::Lit(a)), _) if a.abs() < f64::EPSILON => $azero([r, b]),
+                            _ => $default([r, a, b]),
+                        };
+                        vec![stmt]
+                    }};
+                    ($r:ident, $a:ident, $b:ident, $default:path, $commutative:path) => {
+                        zero_variant!($r, $a, $b, $default, $commutative, $commutative)
+                    };
+                }
+
                 let reg_base = self.unwrap_reg_base(reg_base_opt);
                 let (a_num, a_stmts) = self.translate_num(None, lhs).unwrap();
                 let (b_num, b_stmts) = self.translate_num(None, rhs).unwrap();
@@ -795,16 +794,16 @@ impl Translator {
                     },
                     // Logical
                     BinaryOp::And => vec![Stmt::And([r, a, b])],
-                    BinaryOp::Nor => unreachable!("NOR {:?} {:?} {:?}", r, a, b),
+                    BinaryOp::Nor => unimplemented!(),
                     BinaryOp::Or  => vec![Stmt::Or ([r, a, b])],
                     BinaryOp::Xor => vec![Stmt::Xor([r, a, b])],
                     // Relational
-                    BinaryOp::Eq  => vec![Stmt::Seq([r, a, b])],
-                    BinaryOp::Ge  => vec![Stmt::Sge([r, a, b])],
-                    BinaryOp::Gt  => vec![Stmt::Sgt([r, a, b])],
-                    BinaryOp::Lt  => vec![Stmt::Slt([r, a, b])],
-                    BinaryOp::Le  => vec![Stmt::Sle([r, a, b])],
-                    BinaryOp::Ne  => vec![Stmt::Sne([r, a, b])],
+                    BinaryOp::Eq  => zero_variant!(r, a, b, Stmt::Seq, Stmt::Seqz),
+                    BinaryOp::Ge  => zero_variant!(r, a, b, Stmt::Sge, Stmt::Sgez, Stmt::Slez),
+                    BinaryOp::Gt  => zero_variant!(r, a, b, Stmt::Sgt, Stmt::Sgtz, Stmt::Sltz),
+                    BinaryOp::Le  => zero_variant!(r, a, b, Stmt::Sle, Stmt::Slez, Stmt::Sgez),
+                    BinaryOp::Lt  => zero_variant!(r, a, b, Stmt::Slt, Stmt::Sltz, Stmt::Sgtz),
+                    BinaryOp::Ne  => zero_variant!(r, a, b, Stmt::Sne, Stmt::Snez),
                 };
                 let stmts = a_stmts
                     .into_iter()
