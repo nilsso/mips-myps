@@ -1,5 +1,5 @@
 #![feature(stmt_expr_attributes)]
-// #![feature(map_into_keys_values)]
+#![feature(map_into_keys_values)]
 #![feature(bool_to_option)]
 #![feature(map_try_insert)]
 use std::collections::{BTreeMap, BTreeSet};
