@@ -5,7 +5,6 @@ targetSrc = d3
 factorSrc = d4
 
 def kP = 0.06
-def kI = 0.00
 def kD = 0.02
 def dt = 0.5
 

@@ -22,7 +22,7 @@ token = @{ ASCII_ALPHA ~ char* }
 var = { token }
 
 /* dev: An literal identifier for a device pin. */
-dev = { (dev_expr | dev_lit | dev_self) ~ !("." ~ "all") }
+dev = { (dev_expr | dev_lit | dev_self) ~ !("." ~ ^"all") }
     dev_self =  { "db" }
     dev_lit  = ${ "d" ~ int }
     dev_expr =  { "d(" ~ expr_var ~ ")" }
@@ -32,7 +32,7 @@ dev_var = { dev | var }
  *      Is really just a numeric value suffixed with ".all".
  *      The value can be a literal integer, a parenthesized expression, or a variable
  *      (which must alias a number/register at runtime). */
-dev_net  = { (int | ("(" ~ expr_var ~ ")") | var) ~ "." ~ "all" }
+dev_net  = { (int | ("(" ~ expr_var ~ ")") | var) ~ "." ~ ^"all" }
 /* dev_net  = { (int | ("(" ~ expr_var ~ ")") | var) } */
 
 /* num: Something to be considered as a single, literal numerical value.
@@ -48,16 +48,12 @@ dev_net  = { (int | ("(" ~ expr_var ~ ")") | var) ~ "." ~ "all" }
 num = { num_net_param | num_dev_reagent | num_dev_slot
       | num_dev_param | num_func | ("(" ~ expr_var ~ ")") | dec }
     num_dev_param   = { dev_var ~ "." ~ token }
-    /* num_dev_param   = { dev_var ~ "." ~ "l" ~ "(" ~ token ~ ")" } */
     num_dev_slot    = { dev_var ~ "[" ~ mode ~ "]" ~ "." ~ token }
-    /* num_dev_slot    = { dev_var ~ "." ~ "ls" ~ "(" ~ mode ~ "," ~ token ~ ")" } */
     num_dev_reagent = { dev_var ~ "{" ~ mode ~ "}" ~ "." ~ token }
-    /* num_dev_reagent = { dev_var ~ "." ~ "lr" ~ "(" ~ mode ~ "," ~ token ~ ")" } */
-    num_net_param   = { dev_net ~ "." ~ mode ~ "." ~ token }
-    /* num_net_param   = { dev_net ~ "." ~ "lb" ~ "(" ~ mode ~ "," ~ token ~ ")" } */
+    num_net_param   = { dev_net ~ "." ~ token ~ "." ~ mode }
     num_func        = { func_name ~ "(" ~ rv? ~ ("," ~ rv)* ~ ")" }
         func_name = @{ "d"? ~ token }
-        mode = _{ expr_var }
+        mode = _{ num_var }
 num_var = { num | var }
 
 /* operators */

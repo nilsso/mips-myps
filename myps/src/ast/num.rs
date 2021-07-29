@@ -26,8 +26,8 @@ pub enum Num {
     },
     NetParam {
         hash: Box<Num>,
-        mode: Box<Num>,
         param: String,
+        mode: Box<Num>,
     },
 }
 
@@ -120,11 +120,11 @@ impl<'i> AstNode<'i, Rule, MypsParser, MypsError> for Num {
             Rule::num_net_param => {
                 let mut pairs = pair.into_inner();
                 let hash = pairs.next_pair().unwrap().try_into_ast().unwrap();
-                let mode = pairs.next_pair().unwrap().try_into_ast().unwrap();
-                let param = pairs.final_pair().unwrap().try_into_ast().unwrap();
+                let param = pairs.next_pair().unwrap().try_into_ast().unwrap();
+                let mode = pairs.final_pair().unwrap().try_into_ast().unwrap();
 
                 let (hash, mode) = (Box::new(hash), Box::new(mode));
-                Ok(Self::NetParam { hash, mode, param })
+                Ok(Self::NetParam { hash, param, mode })
             }
             _ => Err(MypsError::pair_wrong_rule("a number-like", pair)),
         }

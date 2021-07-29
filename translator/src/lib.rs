@@ -839,7 +839,12 @@ impl Translator {
                 let (dev_base, dev_stmts) = self.translate_dev(dev).unwrap();
                 let (slot, slot_stmts) = self.translate_num(None, slot).unwrap();
                 let ls_stmt =
-                    Stmt::Ls([reg_base.into(), dev_base.into(), slot.into(), param.into()]);
+                    Stmt::Ls([
+                        reg_base.into(),
+                        dev_base.into(),
+                        slot.into(),
+                        param.into()
+                    ]);
                 let stmts = dev_stmts
                     .into_iter()
                     .chain(slot_stmts.into_iter())
@@ -858,8 +863,8 @@ impl Translator {
                 let lr_stmt = Stmt::Lr([
                     reg_base.into(),
                     dev_base.into(),
-                    reagent.into(),
                     mode.into(),
+                    reagent.into(),
                 ]);
                 let stmts = dev_stmts
                     .into_iter()
@@ -875,8 +880,19 @@ impl Translator {
             } => {
                 let reg_base = self.unwrap_reg_base(reg_base_opt);
                 let (hash, hash_stmts) = self.translate_num(None, hash).unwrap();
+                let mode = if let myps::ast::Num::Var(mut var) = mode {
+                    var.key = var.key.to_lowercase();
+                    myps::ast::Num::Var(var)
+                } else {
+                    mode
+                };
                 let (mode, mode_stmts) = self.translate_num(None, mode).unwrap();
-                let lb_stmt = Stmt::Lb([reg_base.into(), hash.into(), mode.into(), param.into()]);
+                let lb_stmt = Stmt::Lb([
+                    reg_base.into(),
+                    hash.into(),
+                    param.into(),
+                    mode.into()
+                ]);
                 let stmts = hash_stmts
                     .into_iter()
                     .chain(mode_stmts.into_iter())

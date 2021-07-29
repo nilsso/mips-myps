@@ -135,12 +135,24 @@ impl Aliases {
     }
 }
 
+// TODO: Probably going to want to have a separate table for constants
 impl Default for Aliases {
     fn default() -> Self {
         let map = maplit::btreemap! {
             "db".into() => Alias::Dev(DevBase::DB),
             "sp".into() => Alias::Reg(RegBase::SP),
             "ra".into() => Alias::Reg(RegBase::RA),
+            // Back read modes
+            "average".into() => Alias::Num(0.0),
+            "avg".into() => Alias::Num(0.0),
+            "sum".into() => Alias::Num(1.0),
+            "min".into() => Alias::Num(2.0),
+            "max".into() => Alias::Num(3.0),
+            // Reagent modes
+            "contents".into() => Alias::Num(0.0),
+            "required".into() => Alias::Num(1.0),
+            "recipe".into() => Alias::Num(2.0),
+
         };
         Self { map }
     }
