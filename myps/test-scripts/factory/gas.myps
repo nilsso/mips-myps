@@ -38,6 +38,7 @@ loop:
         # (d) calculate moles to remove and add from C and H (nR/nC/nH)
         db.Setting = 5
         yield()
+        fix nCI, nHI # TODO: Scopes need to be restricted better...
         tag partD:
             nT = pT*vF/(R*tT)
             tTnT = tT*nT
