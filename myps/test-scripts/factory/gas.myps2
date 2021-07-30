@@ -1,0 +1,131 @@
+furnace = d0
+tankC   = d1
+tankH   = d2
+nCPump  = d3
+nHPump  = d4
+nIAnlzr = d5
+
+def vF = 1000  # furnace volume
+def R  = 8.314 # universal gas consant
+def dt = 0.5   # time step
+
+# Source volume-mole factor (adjust per setup)
+# e.g. 6100  = 1 furnace (6000) + 1 pipe (100) L
+def vCFactor = (6100) / 6000
+def vHFactor = (6100) / 6000
+
+# PD coefficients and minimum error (perhaps adjust)
+def kPF = 0.06
+def kDF = 0.02
+def kPC = 0.06
+def kDC = 0.02
+def kPH = 0.06
+def kDH = 0.02
+def ERRORF = 0.03
+def ERRORC = 0.03
+def ERRORH = 0.03
+
+# Input target temperatre/pressure format: PPPTTT
+# ```
+# input = db.Setting
+# tT    = input % 1000 * 10 K
+# input = trunc(input / 1000)
+# pT    = input * 100 kPa
+# ```
+# e.g. 500050 -> tT = 50*10 = 500 K, pT = 500*100 = 50,000 kPa
+loop:
+    yield()
+    input = db.Setting
+    if input < 0:
+        db.Setting = 0
+    elif input > 0:
+        # unpack input temperature and pressure
+        input = trunc(input)
+        tT = (input % 1000) * 10
+        pT = trunc(input / 1000) * 100
+
+        # (a) read furnace moles and temperature (nF/tF)
+        fix nF = furnace.TotalMoles
+        tF = furnace.Temperature
+
+        # (b) read tank temperatures
+        tC = tankC.Temperature
+        tH = tankH.Temperature
+
+        # (d) calculate moles to remove and add from C and H (nR/nC/nH)
+        fix nCI, nHI # TODO: Scopes need to be restricted better...
+        tag partD:
+            nT = pT*vF/(R*tT)
+            tTnT = tT*nT
+            nRC = (tTnT-tH*nT)/(tH-tF)+nF
+            nRH = (tTnT-tC*nT)/(tC-tF)+nF
+            nR = max(0, max(nRC, nRH))
+            nD = nF-nR
+            nI = nT-nD
+            tI = (tTnT-tF*nD)/nI
+            nHI = (nI*(tC-tI))/(tC-tH) # nHI
+            nCI = nI-nHI # nCI
+
+        # (e) remove nR, mix nC and nH
+        tag parthE:
+            fix nC = vCFactor * tankC.TotalMoles # calc C moles
+            fix nH = vHFactor * tankH.TotalMoles # calc H moles
+
+            rF = nF - nR # calc F target (rF)
+            rC = nC - nCI # calc C target (rC
+            rH = nH - nHI # calc H target (rH)
+
+            yield()
+            nCPump.On = 1
+            nCPump.Setting = 0
+            nHPump.On = 1
+            nHPump.Setting = 0
+            fix eF = nF - rF # fix F error (nF - rF)
+            fix eC = nC - rC # fix C error (nC - rC)
+            fix eH = nH - rH # fix H error (nH - rH)
+            fix eFPrev = 0 # fix F error (prev)
+            fix eCPrev = 0 # fix C error (prev)
+            fix eHPrev = 0 # fix H error (prev)
+            while eF > 0.1 or eC > 0.1 or eH > 0.1:
+                if eF > ERRORF:
+                    uF = (kPF * eF) + (kDF * (eF - eFPrev) / dt)
+                    furnace.SettingOutput = uF # set furnace out
+                else:
+                    furnace.SettingOutput = 0
+                    furnace.SettingInput = 100
+
+                if eC > ERRORC:
+                    uC = (kPC * eC) + (kDC * (eC - eCPrev) / dt)
+                    nCPump.Setting = uC # set C pump
+
+                if eH > ERRORH:
+                    uH = (kPH * eH) + (kDH * (eH - eHPrev) / dt)
+                    nHPump.Setting = uH # set H pump
+
+                eFPrev = eF # save F error
+                eCPrev = eC # save C error
+                eHPrev = eH # save H error
+
+                yield()
+                if eF > ERRORF:
+                    nF = furnace.TotalMoles.avg
+                    eF = nF - rF
+
+                if eC > ERRORC:
+                    nC = vCFactor * tankC.TotalMoles
+                    eC = nC - rC
+
+                if eH > ERRORH:
+                    nH = vHFactor * tankH.TotalMoles
+                    eH = nH - rH
+            nCPump.On = 0
+            nHPump.On = 0
+
+        # (f) input the nC and nH gas (can the necessary run time be calculated?)
+        furnace.SettingInput = 100
+        while nIAnlzr.TotalMoles.avg > 0:
+            yield()
+        furnace.SettingInput = 0
+
+        # (?) enjoy
+        db.Setting = 0
