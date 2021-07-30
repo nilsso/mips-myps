@@ -18,22 +18,27 @@ loop:
     if db.Setting != 0:
         # (a) batch read temperature and pressure from furnace (tF/pF)
         db.Setting = 2
+        yield()
         fix nF = AdvFurnace.all.TotalMoles.avg
         tF = AdvFurnace.all.Temperature.avg
         pF = AdvFurnace.all.Pressure.avg
 
         # (b) read tank temperatures
         db.Setting = 3
+        yield()
         tC = tankC.Temperature
         tH = tankH.Temperature
 
         # (c) read targets (tT/pT),
         db.Setting = 4
+        yield()
         tT = tTSrc.Setting
         pT = pTSrc.Setting
 
         # (d) calculate moles to remove and add from C and H (nR/nC/nH)
         db.Setting = 5
+        yield()
+        fix nCI, nHI # TODO: Scopes need to be restricted better...
         tag partD:
             nT = pT*vF/(R*tT)
             tTnT = tT*nT
@@ -48,6 +53,7 @@ loop:
 
         # (e) remove nR, mix nC and nH
         db.Setting = 6
+        yield()
         tag parthE:
             def kP = 0.06
             def kD = 0.02
@@ -69,15 +75,25 @@ loop:
             fix eFPrev = 0 # fix F error (prev)
             fix eCPrev = 0 # fix C error (prev)
             fix eHPrev = 0 # fix H error (prev)
+            db.Setting = eF
+            yield()
+            db.Setting = eC
+            yield()
+            db.Setting = eH
+            yield()
+            db.Setting = 999
+            yield()
             while eF > 0.1 or eC > 0.1 or eH > 0.1:
+                db.Setting = 1234
+                yield()
                 uF = (kP * eF) + (kD * (eF - eFPrev) / dt)
-                AdvFurnace.all.SettingOutput = max(0, min(uF, 100)) # set furnace out
+                AdvFurnace.all.SettingOutput = uF # set furnace out
 
                 uC = (kP * eC) + (kD * (eC - eCPrev) / dt)
-                nCPump.Setting = max(0, min(uC, 100)) # set C pump
+                nCPump.Setting = uC # set C pump
 
                 uH = (kP * eH) + (kD * (eH - eHPrev) / dt)
-                nHPump.Setting = max(0, min(uH, 100)) # set H pump
+                nHPump.Setting = uH # set H pump
 
                 eFPrev = eF # save F error
                 eCPrev = eC # save C error
@@ -95,6 +111,7 @@ loop:
 
         # (f) input the nC and nH gas (can the necessary run time be calculated?)
         db.Setting = 7
+        yield()
         AdvFurnace.all.SettingInput = 100
         while PipeAnalyzer.all.TotalMoles.avg > 0:
             yield()

@@ -1,0 +1,47 @@
+tankC = d0
+tankH = d1
+tTSrc = d2
+pTSrc = d3
+# nRDisp = d3
+nCDest = d4
+nHDest = d5
+
+def AdvFurnace = 545937711
+def vF = 1000
+def R = 8.314
+
+def vCFactor = 6100 / 6000
+def vHFactor = 6100 / 6000
+
+loop:
+    yield()
+    # (a) batch read temperature and pressure from furnace (tF/pF)
+    fix nF = AdvFurnace.all.TotalMoles.avg
+    tF = AdvFurnace.all.Temperature.avg
+    pF = AdvFurnace.all.Pressure.avg
+
+    # (b) read tank temperatures
+    tC = tankC.Temperature
+    tH = tankH.Temperature
+
+    # (c) read targets (tT/pT),
+    tT = tTSrc.Setting
+    pT = pTSrc.Setting
+
+    # (d) calculate moles to remove and add from C and H (nR/nC/nH)
+    fix nHI, nCI
+    tag partD:
+        nT = pT*vF/(R*tT)
+        tTnT = tT*nT
+        nRC = (tTnT-tH*nT)/(tH-tF)+nF
+        nRH = (tTnT-tC*nT)/(tC-tF)+nF
+        nR = max(0, max(nRC, nRH))
+        nD = nF-nR
+        nI = nT-nD
+        tI = (tTnT-tF*nD)/nI
+        nHI = (nI*(tC-tI))/(tC-tH) # nHI
+        nCI = nI-nHI # nCI
+
+    db.Setting = nR
+    nCDisp.Setting = nCI
+    nHDisp.Setting = nHI

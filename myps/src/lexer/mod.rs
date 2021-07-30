@@ -14,20 +14,24 @@ use crate::{MypsError, MypsParser, MypsResult, Pair, Rule};
 
 const INDENT_SIZE: usize = 4;
 
-// pub fn lex_str(source: &str) -> MypsResult<()> {
+pub fn lex_string(source: String) -> MypsResult<Item> {
+    lex_lines(source.lines().map(str::to_owned))
+}
+
 pub fn lex_file<P: Into<PathBuf> + std::fmt::Debug>(path: P) -> MypsResult<Item> {
-    // let mut items = Item::block();
+    let f = File::open(path.into()).unwrap();
+    let f = BufReader::new(f);
+    let lines = f.lines().collect::<Result<Vec<_>, _>>().unwrap();
+    lex_lines(lines.into_iter())
+}
+
+pub fn lex_lines<'a>(line_iter: impl Iterator<Item = String>) -> MypsResult<Item> {
     let mut block_stack: Vec<(Block, Option<String>)> = vec![(Block::new(Branch::Program), None)];
     let mut indent_stack = vec![0_usize];
     let mut curr_indent = 0_usize;
     let mut expect_indent = false;
 
-    let f = File::open(path.into()).unwrap();
-    let f = BufReader::new(f);
-
-    for (i, line_res) in f.lines().enumerate() {
-        let line_src = line_res.unwrap();
-
+    for (i, line_src) in line_iter.enumerate() {
         let pair = MypsParser::parse(Rule::single_line, &line_src)
             .unwrap()
             .only_rule(Rule::single_line, "a line")
