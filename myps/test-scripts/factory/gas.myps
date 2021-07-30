@@ -15,8 +15,8 @@ def nCfactor = (6200) / 6000
 def nHfactor = (6200) / 6000
 
 # PD coefficients and minimum error (perhaps adjust)
-def kPF = 0.30
-def kDF = 0.30
+def kPF = 0.06
+def kDF = 0.03
 
 def kPC = 0.06
 def kDC = 0.03
@@ -25,8 +25,8 @@ def kPH = 0.06
 def kDH = 0.03
 
 def ERRORF = 0.01
-def ERRORC = 0.01
-def ERRORH = 0.01
+def ERRORC = 0.03
+def ERRORH = 0.03
 
 # Input target temperature/pressure format: PPPTTT
 # ```
@@ -70,12 +70,12 @@ loop:
             rF = nF - nR
             eFPrev = nF - rF
 
-            nC = tankC.TotalMoles - nCI
-            rC = nCfactor * nC
+            nC = nCfactor * tankC.TotalMoles
+            rC = nC - nCI
             eCPrev = nC - rC
 
-            nH = tankH.TotalMoles - nHI
-            rH = nHfactor * nH
+            nH = nHfactor * tankH.TotalMoles
+            rH = nH - nHI
             eHPrev = nH - rH
 
         # (e) remove nR, mix nC and nH

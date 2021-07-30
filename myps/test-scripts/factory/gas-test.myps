@@ -1,43 +1,70 @@
-tankC = d0
-tankH = d1
-tTSrc = d2
-pTSrc = d3
-# nRDisp = d3
-nCDest = d4
-nHDest = d5
+furnace = d0
+tankC = d1
+tankH = d2
+eFdest = d3
+eCdest = d4
+eHdest = d5
 
-def AdvFurnace = 545937711
 def vF = 1000
-def R = 8.314
+def R  = 8.314
 
-def vCFactor = 6100 / 6000
-def vHFactor = 6100 / 6000
+def nCfactor = (6200) / 6000
+def nHfactor = (6200) / 6000
+
+def ERRORF = 0.01
+def ERRORC = 0.03
+def ERRORH = 0.03
 
 loop:
     yield()
-    # (a) batch read temperature and pressure from furnace (tF/pF)
-    fix nF = AdvFurnace.all.TotalMoles.avg
-    tF = AdvFurnace.all.Temperature.avg
-    #pF = AdvFurnace.all.Pressure.avg
+    input = db.Setting
+    if input > 0:
+        input = trunc(input)
+        tT = (input % 1000) * 10
+        pT = trunc(input / 1000) * 100
+        nF = furnace.TotalMoles
+        tF = furnace.Temperature
+        tC = tankC.Temperature
+        tH = tankH.Temperature
 
-    # (b) read tank temperatures
-    tC = tankC.Temperature
-    tH = tankH.Temperature
+        nT = pT * vF / (R * tT)
+        nRC = nT * (tT - tH) / (tH - tF) + nF
+        nRH = nT * (tT - tC) / (tC - tF) + nF
+        nR = max(0, max(nRC, nRH))
+        nI = nT - nF + nR
+        tI = (tT * nT - tF * (nF - nR)) / nI
+        nHI = nI * (tC - tI) / (tC - tH)
+        nCI = nI - nHI
 
-    # (c) read targets (tT/pT),
-    tT = tTSrc.Setting
-    pT = pTSrc.Setting
+        rF = nF - nR
 
-    # (d) calculate moles to remove and add from C and H (nR/nC/nH)
-    nT = pT * vF / (R * tT)
-    nRC = nT * (tT - tH) / (tH - tF) + nF
-    nRH = nT * (tT - tC) / (tC - tF) + nF
-    nR = max(0, max(nRC, nRH))
-    nI = nT - nF + nR
-    tI = (tT * nT - tF * (nF - nR)) / nI
-    nHI = nI * (tC - tI) / (tC - tH)
-    nCI = nI - nHI # nCI
+        nC = nCfactor * tankC.TotalMoles
+        rC = nC - nCI
 
-    db.Setting = nR
-    nCDest.Setting = nCI
-    nHDest.Setting = nHI
+        nH = nHfactor * tankH.TotalMoles
+        rH = nH - nHI
+
+        tag PDLoop:
+            yield()
+            nF = furnace.TotalMoles
+            nC = nCfactor * tankC.TotalMoles
+            nH = nHfactor * tankH.TotalMoles
+
+            eF = nF - rF
+            eC = nC - rC
+            eH = nH - rH
+
+            FNotDone = (eF > ERRORF)
+            CNotDone = (eC > ERRORC)
+            HNotDone = (eH > ERRORH)
+
+            eFdest.Setting = FNotDone ? eF : 0
+            #eFdest.On      = FNotDone ? eF : 0
+            eCdest.Setting = FNotDone ? eC : 0
+            #eCdest.On      = FNotDone ? eC : 0
+            eHdest.Setting = CNotDone ? eH : 0
+            #eHdest.On      = CNotDone ? eH : 0
+
+            bnez(FNotDone, PDLoop)
+            bnez(CNotDone, PDLoop)
+            bnez(HNotDone, PDLoop)
