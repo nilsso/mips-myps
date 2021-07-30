@@ -4,6 +4,7 @@ use mips::MipsResult;
 
 use crate::ast::{Block, Branch, Stmt};
 use crate::{MypsError, MypsParser, MypsResult, Pair, Rule};
+use itertools::chain;
 
 #[derive(Debug)]
 pub enum LineItem<'a> {
@@ -131,6 +132,33 @@ impl Item {
 
     pub fn is_if_elif_else(&self) -> bool {
         self.is_if() || self.is_elif() || self.is_else()
+    }
+
+    pub fn chain_id(&self) -> Option<usize> {
+        match self {
+            Self::Block(
+                Block {
+                    branch: Branch::If { chain_id_opt, .. },
+                    ..
+                },
+                ..,
+            ) => chain_id_opt.clone(),
+            Self::Block(
+                Block {
+                    branch: Branch::Elif { chain_id, .. },
+                    ..
+                },
+                ..,
+            ) |
+            Self::Block(
+                Block {
+                    branch: Branch::Else { chain_id, .. },
+                    ..
+                },
+                ..,
+            ) => Some(*chain_id),
+            _ => None,
+        }
     }
 
     pub fn iter(&self) -> LineItemIter {

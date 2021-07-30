@@ -424,7 +424,7 @@ impl Mips {
                         match arg {
                             Arg::LineAbs(LineAbs(num)) if conf.remove_tags => {
                                 if let Some(key) = num.as_alias() {
-                                    let i = tag_lines.get(key).unwrap();
+                                    let i = tag_lines.get(key).expect(key);
                                     *num = Num::Lit(*i as f64);
                                 }
                             }
@@ -675,13 +675,11 @@ impl Mips {
             //         let (s, e) = reg.lifetime();
             for i in 0..n {
                 #[rustfmt::skip]
-                match (s == i, s <= i && i <= e, i == e) {
-                    ( true,  true,  true) => output.push_str(&format!("{:>2}", i % 10)),
-                    ( true,  true, false) => output.push_str(&format!("{:>2}", i % 10)),
-                    (false,  true, false) => output.push_str("--"),
-                    (false,  true,  true) => output.push_str(&format!("{:->2}", i % 10)),
+                match (i == s || i == e, s <= i && i <= e) {
+                    (false, true) => output.push_str(" -"),
+                    (true,  true) => output.push_str(&format!("{:>2}", i % 10)),
                     _                     => output.push_str(" |"),
-                };
+                }
             }
             output.push_str("\n");
         }

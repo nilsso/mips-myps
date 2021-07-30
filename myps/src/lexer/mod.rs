@@ -117,10 +117,15 @@ pub fn lex_lines<'a>(line_iter: impl Iterator<Item = String>) -> MypsResult<Item
         if let Item::Block(block, ..) = item {
             let items = &mut block.items;
             for i in 0..items.len() {
+
                 if matches!(items[i], Item::Block(..)) {
                     if items[i].is_if_elif_else() {
                         let j = i + 1;
-                        if j < items.len() {}
+                        let prev_chain_id = if i > 0 {
+                            items[i - 1].chain_id()
+                        } else {
+                            None
+                        };
                         let next_is_elif_else = j < items.len() && items[j].is_elif_else();
                         match &mut items[i] {
                             Item::Block(
@@ -147,7 +152,7 @@ pub fn lex_lines<'a>(line_iter: impl Iterator<Item = String>) -> MypsResult<Item
                                 },
                                 ..,
                             ) => {
-                                *chain_id = *next_chain_id - 1;
+                                *chain_id = prev_chain_id.unwrap();
                                 if next_is_elif_else {
                                     *end_chain = false;
                                 }
@@ -159,7 +164,7 @@ pub fn lex_lines<'a>(line_iter: impl Iterator<Item = String>) -> MypsResult<Item
                                 },
                                 ..,
                             ) => {
-                                // *chain_id = *next_chain_id - 1;
+                                *chain_id = prev_chain_id.unwrap();
                             }
                             _ => unreachable!(),
                         }

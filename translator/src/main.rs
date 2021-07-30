@@ -40,20 +40,20 @@ fn main() {
     #[rustfmt::skip]
         let mips = mips
         .optimize(OptimizationConfig {
-            // remove_comments: true,
-            remove_comments: false,
+            remove_comments: true,
+            // remove_comments: false,
 
             remove_empty: true,
             // remove_empty: false,
 
-            // remove_empty_comments: true,
-            remove_empty_comments: false,
+            remove_empty_comments: true,
+            // remove_empty_comments: false,
 
             remove_reg_aliases: true,
             // remove_reg_aliases: false,
 
-            remove_dev_aliases: true,
-            // remove_dev_aliases: false,
+            // remove_dev_aliases: true,
+            remove_dev_aliases: false,
 
             remove_defines: true,
             // remove_defines: false,
@@ -74,8 +74,8 @@ fn main() {
     }
     println!("--------------------------------------------------------------------------------");
     for (_i, line) in mips.lines.iter().enumerate() {
-        // println!("{:>w$}: {}", _i, line, w = w);
-        println!("{}", line);
+        println!("{:>w$}: {}", _i, line, w = w);
+        // println!("{}", line);
     }
     // for (i, (index, (s, e))) in mips.analyze_lifetimes().iter().enumerate() {
     //     println!("{}: {} ({},{})", i, index, s, e);
