@@ -11,8 +11,8 @@ def dt = 0.5   # time step
 
 # Source volume-mole factor (adjust per setup)
 # e.g. 6100  = 1 furnace (6000) + 2 pipes (200) L
-def nCFactor = (6200) / 6000
-def nHFactor = (6200) / 6000
+def nCfactor = (6200) / 6000
+def nHfactor = (6200) / 6000
 
 # PD coefficients and minimum error (perhaps adjust)
 def kPF = 0.30
@@ -71,11 +71,11 @@ loop:
             eFPrev = nF - rF
 
             nC = tankC.TotalMoles - nCI
-            rC = nCFactor * nC
+            rC = nCfactor * nC
             eCPrev = nC - rC
 
             nH = tankH.TotalMoles - nHI
-            rH = nHFactor * nH
+            rH = nHfactor * nH
             eHPrev = nH - rH
 
         # (e) remove nR, mix nC and nH
@@ -90,13 +90,13 @@ loop:
                 #uF = (kPF * eF) + (kDF * (eF - eFPrev) / dt) # (kPF, kDF)
                 eFPrev = eF
 
-                nC = nCFactor * tankC.TotalMoles
+                nC = nCfactor * tankC.TotalMoles
                 eC = nC - rC
                 #uC = max(0, min(100, (kPC * eC) + (kDC * (eC - eCPrev) / dt))) # (kPC, kDC)
                 uC = (kPC * eC) + (kDC * (eC - eCPrev) / dt) # (kPC, kDC)
                 eCPrev = eC
 
-                nH = nHFactor * tankH.TotalMoles
+                nH = nHfactor * tankH.TotalMoles
                 eH = nH - rH
                 #uH = max(0, min(100, (kPH * eH) + (kDH * (eH - eHPrev) / dt)))  # (kPH, kDH)
                 uH = (kPH * eH) + (kDH * (eH - eHPrev) / dt) # (kPH, kDH)
@@ -104,22 +104,22 @@ loop:
 
                 FNotDone = (eF > ERRORF)
                 CNotDone = (eC > ERRORC)
-                HNotDone = (eF > ERRORH)
+                HNotDone = (eH > ERRORH)
 
-                furnace.SettingOutput = FNotDone ? uF : 0
+                furnace.SettingOutput  = FNotDone ? uF : 0
                 #furnace.SettingInput  = FNotDone ? 0  : 1000
-                nCPump .Setting       = CNotDone ? uC : 0
-                nHPump .Setting       = HNotDone ? uH : 0
+                nCPump.Setting         = CNotDone ? uC : 0
+                nHPump.Setting         = HNotDone ? uH : 0
 
-                nCPump .On = CNotDone
-                nHPump .On = HNotDone
+                nCPump.On = CNotDone
+                nHPump.On = HNotDone
 
                 bnez(FNotDone, PDLoop)
                 bnez(CNotDone, PDLoop)
                 bnez(HNotDone, PDLoop)
 
         # (g) input the nC and nH gas
-        furnace.SettingInput = 1000
+        furnace.SettingInput  = 1000
         while nIAnlzr.TotalMoles > 0:
             yield()
         furnace.SettingInput = 0
