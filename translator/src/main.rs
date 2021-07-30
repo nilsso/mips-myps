@@ -67,6 +67,7 @@ fn main() {
         )
         .unwrap();
 
+    println!("{}", mips.interference_graph());
     let w = (mips.lines.len() as f64 - 1.0).log10().floor().max(0_f64) as usize + 1;
     for (i, line) in mips.lines.iter().enumerate() {
         println!("{:>w$}: {:?}", i, line, w = w);
@@ -76,7 +77,6 @@ fn main() {
         // println!("{:>w$}: {}", _i, line, w = w);
         println!("{}", line);
     }
-    // println!("{}", mips.interference_graph());
     // for (i, (index, (s, e))) in mips.analyze_lifetimes().iter().enumerate() {
     //     println!("{}: {} ({},{})", i, index, s, e);
     // }
