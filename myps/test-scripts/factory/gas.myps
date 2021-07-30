@@ -10,9 +10,9 @@ def R  = 8.314 # universal gas consant
 def dt = 0.5   # time step
 
 # Source volume-mole factor (adjust per setup)
-# e.g. 6100  = 1 furnace (6000) + 1 pipe (100) L
-def vCFactor = (6100) / 6000
-def vHFactor = (6100) / 6000
+# e.g. 6100  = 1 furnace (6000) + 2 pipes (200) L
+def vCFactor = (6200) / 6000
+def vHFactor = (6200) / 6000
 
 # PD coefficients and minimum error (perhaps adjust)
 def kPF = 0.06
@@ -21,9 +21,9 @@ def kPC = 0.06
 def kDC = 0.02
 def kPH = 0.06
 def kDH = 0.02
-def ERRORF = 0.03
-def ERRORC = 0.03
-def ERRORH = 0.03
+def ERRORF = 0.01
+def ERRORC = 0.01
+def ERRORH = 0.01
 
 # Input target temperature/pressure format: PPPTTT
 # ```
@@ -57,7 +57,7 @@ loop:
             nT = pT * vF / (R * tT)
             nRC = nT * (tT - tH) / (tH - tF) + nF
             nRH = nT * (tT - tC) / (tC - tF) + nF
-            nR = max(0, min(nRC, nRH))
+            nR = max(0, max(nRC, nRH))
             nI = nT - nF + nR
             tI = (tT * nT - tF * (nF - nR)) / nI
             nHI = nI * (tC - tI) / (tC - tH)
@@ -71,60 +71,45 @@ loop:
             rH = nH - nHI # calc H target (rH)
 
         # (e) remove nR, mix nC and nH
-        yield()
-        nCPump.On = 1
-        nCPump.Setting = 0
-        nHPump.On = 1
-        nHPump.Setting = 0
-
-        # (f) remove nR, mix nC and nH
         tag E:
-            fix eF = nF - rF # fix F error (nF - rF)
-            fix eC = nC - rC # fix C error (nC - rC)
-            fix eH = nH - rH # fix H error (nH - rH)
-            fix eFPrev = 0 # fix F error (prev)
-            fix eCPrev = 0 # fix C error (prev)
-            fix eHPrev = 0 # fix H error (prev)
+            fix eFPrev = 0 # fix previous F error
+            fix eCPrev = 0 # fix previous C error
+            fix eHPrev = 0 # fix previous H error
+
             # triple PD loop! controls reaching rF/C/H moles in F/C/H
             # if rF is reached, start inputting the nI mixture in advance to (f)
             tag PDLoop:
-                if eF > ERRORF:
-                    uF = (kPF * eF) + (kDF * (eF - eFPrev) / dt)
-                    furnace.SettingOutput = uF
-                    eFPrev = eF
-                else:
-                    furnace.SettingOutput = 0
-                    furnace.SettingInput = 100
-
-                if eC > ERRORC:
-                    uC = (kPC * eC) + (kDC * (eC - eCPrev) / dt)
-                    nCPump.Setting = uC # set C pump
-                    eCPrev = eC
-
-                if eH > ERRORH:
-                    uH = (kPH * eH) + (kDH * (eH - eHPrev) / dt)
-                    nHPump.Setting = uH # set H pump
-                    eHPrev = eH
-
-                # check feedback and calculate new error
                 yield()
-                if eF > ERRORF:
-                    nF = furnace.TotalMoles
-                    eF = nF - rF
+                nF = furnace.TotalMoles
+                nC = vCFactor * tankC.TotalMoles
+                nH = vHFactor * tankH.TotalMoles
 
-                if eC > ERRORC:
-                    nC = vCFactor * tankC.TotalMoles
-                    eC = nC - rC
+                eF = nF - rF
+                eC = nC - rC
+                eH = nH - rH
 
-                if eH > ERRORH:
-                    nH = vHFactor * tankH.TotalMoles
-                    eH = nH - rH
+                uF = max(0, min(100, (kPF * eF) + (kDF * (eF - eFPrev) / dt)))
+                uC = max(0, min(100, (kPC * eC) + (kDC * (eC - eCPrev) / dt)))
+                uH = max(0, min(100, (kPH * eH) + (kDH * (eH - eHPrev) / dt)))
+
+                eFPrev = eF
+                eCPrev = eC
+                eHPrev = eH
+
+                Fdone = (eF <= ERRORF)
+                Cdone = (eC <= ERRORC)
+                Hdone = (eF <= ERRORH)
+
+                furnace.SettingOutput = Fdone ? 0 : uF
+                nCPump .SettingOutput = Cdone ? 0 : uC
+                nHPump .SettingOutput = Hdone ? 0 : uH
+
+                nCPump .On = Cdone
+                nHPump .On = Hdone
 
                 bgt(eF, ERRORF, PDLoop)
                 bgt(eC, ERRORC, PDLoop)
                 bgt(eH, ERRORH, PDLoop)
-        nCPump.On = 0
-        nHPump.On = 0
 
         # (g) input the nC and nH gas
         furnace.SettingInput = 100

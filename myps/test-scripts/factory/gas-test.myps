@@ -32,12 +32,11 @@ loop:
     nT = pT * vF / (R * tT)
     nRC = nT * (tT - tH) / (tH - tF) + nF
     nRH = nT * (tT - tC) / (tC - tF) + nF
-    #nRH = nT * (tC - tT) / (tF - tC) + nF
-    nR = max(0, min(nRC, nRH))
+    nR = max(0, max(nRC, nRH))
     nI = nT - nF + nR
     tI = (tT * nT - tF * (nF - nR)) / nI
     nHI = nI * (tC - tI) / (tC - tH)
-    nCI = nI - nHI
+    nCI = nI - nHI # nCI
 
     db.Setting = nR
     nCDest.Setting = nCI
