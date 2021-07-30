@@ -5,21 +5,25 @@ nCPump  = d3
 nHPump  = d4
 nIAnlzr = d5
 
-def vF = 1000
-def R  = 8.314
-def dt = 0.5
+def vF = 1000  # furnace volume
+def R  = 8.314 # universal gas consant
+def dt = 0.5   # time step
 
 # Source volume-mole factor (adjust per setup)
 # e.g. 6100  = 1 furnace (6000) + 1 pipe (100) L
 def vCFactor = (6100) / 6000
 def vHFactor = (6100) / 6000
 
-# PD coefficients (perhaps adjust)
-# kPF and kDF for furnace pumps, kPI and kDI for C and H pumps
+# PD coefficients and minimum error (perhaps adjust)
 def kPF = 0.06
 def kDF = 0.02
-def kPI = 0.06
-def kDI = 0.02
+def kPC = 0.06
+def kDC = 0.02
+def kPH = 0.06
+def kDH = 0.02
+def ERRORF = 0.03
+def ERRORC = 0.03
+def ERRORH = 0.03
 
 # Input target temperatre/pressure format: PPPTTT
 # ```
@@ -73,7 +77,9 @@ loop:
 
             yield()
             nCPump.On = 1
+            nCPump.Setting = 0
             nHPump.On = 1
+            nHPump.Setting = 0
             fix eF = nF - rF # fix F error (nF - rF)
             fix eC = nC - rC # fix C error (nC - rC)
             fix eH = nH - rH # fix H error (nH - rH)
@@ -81,26 +87,37 @@ loop:
             fix eCPrev = 0 # fix C error (prev)
             fix eHPrev = 0 # fix H error (prev)
             while eF > 0.1 or eC > 0.1 or eH > 0.1:
-                uF = (kPF * eF) + (kDF * (eF - eFPrev) / dt)
-                furnace.SettingOutput = uF # set furnace out
+                if eF > ERRORF:
+                    uF = (kPF * eF) + (kDF * (eF - eFPrev) / dt)
+                    furnace.SettingOutput = uF # set furnace out
+                else:
+                    furnace.SettingOutput = 0
+                    furnace.SettingInput = 100
 
-                uC = (kPI * eC) + (kDI * (eC - eCPrev) / dt)
-                nCPump.Setting = uC # set C pump
+                if eC > ERRORC:
+                    uC = (kPC * eC) + (kDC * (eC - eCPrev) / dt)
+                    nCPump.Setting = uC # set C pump
 
-                uH = (kPI * eH) + (kDI * (eH - eHPrev) / dt)
-                nHPump.Setting = uH # set H pump
+                if eH > ERRORH:
+                    uH = (kPH * eH) + (kDH * (eH - eHPrev) / dt)
+                    nHPump.Setting = uH # set H pump
 
                 eFPrev = eF # save F error
                 eCPrev = eC # save C error
                 eHPrev = eH # save H error
 
                 yield()
-                nF = furnace.TotalMoles.avg
-                nC = vCFactor * tankC.TotalMoles
-                nH = vHFactor * tankH.TotalMoles
-                eF = nF - rF
-                eC = nC - rC
-                eH = nH - rH
+                if eF > ERRORF:
+                    nF = furnace.TotalMoles.avg
+                    eF = nF - rF
+
+                if eC > ERRORC:
+                    nC = vCFactor * tankC.TotalMoles
+                    eC = nC - rC
+
+                if eH > ERRORH:
+                    nH = vHFactor * tankH.TotalMoles
+                    eH = nH - rH
             nCPump.On = 0
             nHPump.On = 0
 
