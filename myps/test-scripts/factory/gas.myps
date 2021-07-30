@@ -11,16 +11,19 @@ def dt = 0.5   # time step
 
 # Source volume-mole factor (adjust per setup)
 # e.g. 6100  = 1 furnace (6000) + 2 pipes (200) L
-def vCFactor = (6200) / 6000
-def vHFactor = (6200) / 6000
+def nCFactor = (6200) / 6000
+def nHFactor = (6200) / 6000
 
 # PD coefficients and minimum error (perhaps adjust)
-def kPF = 0.06
-def kDF = 0.02
+def kPF = 0.30
+def kDF = 0.30
+
 def kPC = 0.06
-def kDC = 0.02
+def kDC = 0.03
+
 def kPH = 0.06
-def kDH = 0.02
+def kDH = 0.03
+
 def ERRORF = 0.01
 def ERRORC = 0.01
 def ERRORH = 0.01
@@ -39,21 +42,22 @@ loop:
         db.Setting = 0
     elif input > 0:
         # (a) unpack input temperature and pressure
-        input = trunc(input)
-        tT = (input % 1000) * 10
-        pT = trunc(input / 1000) * 100
 
         # (b) batch read temperature and pressure from furnace (tF/pF)
-        nF = furnace.TotalMoles
-        tF = furnace.Temperature
 
         # (c) read tank temperatures
-        tC = tankC.Temperature
-        tH = tankH.Temperature
 
         # (d) calculate moles to remove and add from C and H (nR/nC/nH)
-        fix rF, rC, rH
+        fix rF, rC, rH, eFPrev, eCPrev, eHPrev
         tag calcMolesTargets:
+            input = trunc(input)
+            tT = (input % 1000) * 10
+            pT = trunc(input / 1000) * 100
+            nF = furnace.TotalMoles
+            tF = furnace.Temperature
+            tC = tankC.Temperature
+            tH = tankH.Temperature
+
             nT = pT * vF / (R * tT)
             nRC = nT * (tT - tH) / (tH - tF) + nF
             nRH = nT * (tT - tC) / (tC - tF) + nF
@@ -61,59 +65,62 @@ loop:
             nI = nT - nF + nR
             tI = (tT * nT - tF * (nF - nR)) / nI
             nHI = nI * (tC - tI) / (tC - tH)
-            nCI = nI - nHI # nCI
+            nCI = nI - nHI
 
-            nC = vCFactor * tankC.TotalMoles # calc C moles
-            nH = vHFactor * tankH.TotalMoles # calc H moles
+            rF = nF - nR
+            eFPrev = nF - rF
 
-            rF = nF - nR # calc F target (rF)
-            rC = nC - nCI # calc C target (rC
-            rH = nH - nHI # calc H target (rH)
+            nC = tankC.TotalMoles - nCI
+            rC = nCFactor * nC
+            eCPrev = nC - rC
+
+            nH = tankH.TotalMoles - nHI
+            rH = nHFactor * nH
+            eHPrev = nH - rH
 
         # (e) remove nR, mix nC and nH
         tag E:
-            fix eFPrev = 0 # fix previous F error
-            fix eCPrev = 0 # fix previous C error
-            fix eHPrev = 0 # fix previous H error
-
             # triple PD loop! controls reaching rF/C/H moles in F/C/H
             # if rF is reached, start inputting the nI mixture in advance to (f)
             tag PDLoop:
                 yield()
                 nF = furnace.TotalMoles
-                nC = vCFactor * tankC.TotalMoles
-                nH = vHFactor * tankH.TotalMoles
-
                 eF = nF - rF
-                eC = nC - rC
-                eH = nH - rH
-
-                uF = max(0, min(100, (kPF * eF) + (kDF * (eF - eFPrev) / dt)))
-                uC = max(0, min(100, (kPC * eC) + (kDC * (eC - eCPrev) / dt)))
-                uH = max(0, min(100, (kPH * eH) + (kDH * (eH - eHPrev) / dt)))
-
+                uF = max(0, min(100, (kPF * eF) + (kDF * (eF - eFPrev) / dt))) # (kPF, kDF)
+                #uF = (kPF * eF) + (kDF * (eF - eFPrev) / dt) # (kPF, kDF)
                 eFPrev = eF
+
+                nC = nCFactor * tankC.TotalMoles
+                eC = nC - rC
+                #uC = max(0, min(100, (kPC * eC) + (kDC * (eC - eCPrev) / dt))) # (kPC, kDC)
+                uC = (kPC * eC) + (kDC * (eC - eCPrev) / dt) # (kPC, kDC)
                 eCPrev = eC
+
+                nH = nHFactor * tankH.TotalMoles
+                eH = nH - rH
+                #uH = max(0, min(100, (kPH * eH) + (kDH * (eH - eHPrev) / dt)))  # (kPH, kDH)
+                uH = (kPH * eH) + (kDH * (eH - eHPrev) / dt) # (kPH, kDH)
                 eHPrev = eH
 
-                Fdone = (eF <= ERRORF)
-                Cdone = (eC <= ERRORC)
-                Hdone = (eF <= ERRORH)
+                FNotDone = (eF > ERRORF)
+                CNotDone = (eC > ERRORC)
+                HNotDone = (eF > ERRORH)
 
-                furnace.SettingOutput = Fdone ? 0 : uF
-                nCPump .SettingOutput = Cdone ? 0 : uC
-                nHPump .SettingOutput = Hdone ? 0 : uH
+                furnace.SettingOutput = FNotDone ? uF : 0
+                #furnace.SettingInput  = FNotDone ? 0  : 1000
+                nCPump .Setting       = CNotDone ? uC : 0
+                nHPump .Setting       = HNotDone ? uH : 0
 
-                nCPump .On = Cdone
-                nHPump .On = Hdone
+                nCPump .On = CNotDone
+                nHPump .On = HNotDone
 
-                bgt(eF, ERRORF, PDLoop)
-                bgt(eC, ERRORC, PDLoop)
-                bgt(eH, ERRORH, PDLoop)
+                bnez(FNotDone, PDLoop)
+                bnez(CNotDone, PDLoop)
+                bnez(HNotDone, PDLoop)
 
         # (g) input the nC and nH gas
-        furnace.SettingInput = 100
-        while furnace.TotalMoles > 0:
+        furnace.SettingInput = 1000
+        while nIAnlzr.TotalMoles > 0:
             yield()
         furnace.SettingInput = 0
 
