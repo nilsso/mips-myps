@@ -36,13 +36,13 @@ loop:
         nHI = nI * (tC - tI) / (tC - tH)
         nCI = nI - nHI
 
-        rF = nF - nR
+        fix rF = nF - nR
 
         nC = nCfactor * tankC.TotalMoles
-        rC = nC - nCI
+        fix rC = nC - nCI
 
         nH = nHfactor * tankH.TotalMoles
-        rH = nH - nHI
+        fix rH = nH - nHI
 
         tag PDLoop:
             yield()
@@ -59,11 +59,11 @@ loop:
             HNotDone = (eH > ERRORH)
 
             eFdest.Setting = FNotDone ? eF : 0
-            #eFdest.On      = FNotDone ? eF : 0
+            #eFdest.On     = FNotDone ? eF : 0
             eCdest.Setting = FNotDone ? eC : 0
-            #eCdest.On      = FNotDone ? eC : 0
+            #eCdest.On     = FNotDone ? eC : 0
             eHdest.Setting = CNotDone ? eH : 0
-            #eHdest.On      = CNotDone ? eH : 0
+            #eHdest.On     = CNotDone ? eH : 0
 
             bnez(FNotDone, PDLoop)
             bnez(CNotDone, PDLoop)
