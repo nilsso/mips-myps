@@ -20,8 +20,7 @@ loop:
     targetCode = validatorControl.Setting
     importantStartButton.On = (targetCode > 0)
 
-    if importantStartButton.Setting:
-        # going to assume that furnaceControl.Setting is -1 by here
+    if importantStartButton.Setting and furnaceControl.Setting == -1:
         tT = (targetCode % 1000) * 10
         pT = trunc(targetCode / 1000) * 100
 
