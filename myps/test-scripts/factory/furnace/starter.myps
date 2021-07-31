@@ -8,12 +8,10 @@ progressDisp         = d5
 def BLUE  = 0
 def GREEN = 2
 
-tTDisp.On          = 0
-tTDisp.On          = 0
-progressDisp.On    = 0
 tTDisp.Color       = GREEN
-tTDisp.Color       = GREEN
+pTDisp.Color       = GREEN
 progressDisp.Color = BLUE
+progressDisp.Mode  = 1
 
 loop:
     yield()
@@ -38,4 +36,8 @@ loop:
             yield()
         pTDisp.On       = 0
         tTDisp.On       = 0
+        progressDisp.On = 0
+    else:
+        tTDisp.On       = 0
+        pTDisp.On       = 0
         progressDisp.On = 0

@@ -10,6 +10,11 @@ def AdvancedFurnace = 545937711
 def vF = 1000
 def R  = 8.31446261815324
 
+# (NOTE: ADJUST PER SETUP)
+# Source volume-mole factor
+def nCfactor = (6100) / 6000
+def nHfactor = (6100) / 6000
+
 def GREEN = 2
 def BLUE  = 0
 def RED   = 4
@@ -26,11 +31,15 @@ def ErrorPMax = -4 # if target pressure > maximum (60,000)
 def ErrorCMoles = -5 # if cold source doesn't have enough moles
 def ErrorHMoles = -6 # if hot source doesn't have enough moles
 
+db.Setting = 0
 loop:
     yield()
     targetCode = inputControl.Setting
     tT = (targetCode % 1000) * 10
     pT = trunc(targetCode / 1000) * 100
+
+    tTStagingDisp.Setting = tT
+    pTStagingDisp.Setting = pT
 
     tC = tankC.Temperature
     tH = tankH.Temperature
@@ -63,11 +72,11 @@ loop:
         nHI = nI * (tC - tI) / (tC - tH)
         nCI = nI - nHI
 
-        if nCI > tankC.TotalMoles:
+        if nCI > nCfactor * tankC.TotalMoles:
             db.Setting = ErrorCMoles
             tTStagingDisp.Color = GRAY
             pTStagingDisp.Color = GRAY
-        if nHI > tankH.TotalMoles:
+        if nHI > nHfactor * tankH.TotalMoles:
             db.Setting = ErrorHMoles
             tTStagingDisp.Color = GRAY
             pTStagingDisp.Color = GRAY

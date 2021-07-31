@@ -9,10 +9,10 @@
 # greater than the hot source temperature then wackiness will certainly occurr!
 # (I may change this point in the future)
 furnace    = d0
-tankC      = d0
-tankH      = d1
-nCPump     = d2
-nHPump     = d3
+tankC      = d1
+tankH      = d2
+nCPump     = d3
+nHPump     = d4
 nIAnalyzer = d5
 
 # Constants
@@ -43,9 +43,9 @@ def kDH = 0.06
 # (a) the removal of gas from the furnace,
 # (b) the transfer of cold CO2 (i.e. removal from source)
 # (c) the transfer of hot CO2
-def ERRORF = 0.1
-def ERRORC = 0.1
-def ERRORH = 0.1
+def ERRORF = 0.5
+def ERRORC = 0.5
+def ERRORH = 0.5
 
 db.Setting = -1
 loop:
@@ -124,8 +124,8 @@ loop:
                 eHPrev = eH
 
                 # (f.4) Set housing to current progress (total error / initial error)
-                progress = ((eF - ERRORF) + (eC - ERRORC) + (eH - ERRORH)) / eTotal0
-                db.Setting = progress # set progress
+                eTotal = (eF + eC + eH) / eTotal0
+                db.Setting = 1 - eTotal # set progress
 
                 # (f.5) Set rates from control values, and loop if any error is above limit
                 FNotDone = (eF > ERRORF)
