@@ -1,9 +1,11 @@
-furnace = d0
-tankC   = d1
-tankH   = d2
-nCPump  = d3
-nHPump  = d4
-nIAnlzr = d5
+#furnace = d0
+#nIAnlzr = d5
+
+tankC   = d0
+tankH   = d1
+nCPump  = d2
+nHPump  = d3
+progressDest = d4
 
 def vF = 1000  # furnace volume
 def R  = 8.314 # universal gas consant
@@ -15,14 +17,14 @@ def nCfactor = (6200) / 6000
 def nHfactor = (6200) / 6000
 
 # PD coefficients and minimum error (perhaps adjust)
-def kPF = 0.06
-def kDF = 0.03
+def kPF = 0.09
+def kDF = 0.06
 
-def kPC = 0.06
-def kDC = 0.03
+def kPC = 0.09
+def kDC = 0.06
 
-def kPH = 0.06
-def kDH = 0.03
+def kPH = 0.09
+def kDH = 0.06
 
 def ERRORF = 0.01
 def ERRORC = 0.03

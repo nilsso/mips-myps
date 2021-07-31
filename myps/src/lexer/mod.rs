@@ -19,7 +19,8 @@ pub fn lex_string(source: String) -> MypsResult<Item> {
 }
 
 pub fn lex_file<P: Into<PathBuf> + std::fmt::Debug>(path: P) -> MypsResult<Item> {
-    let f = File::open(path.into()).unwrap();
+    let path_string = format!("{:?}", path);
+    let f = File::open(path.into()).expect(&path_string);
     let f = BufReader::new(f);
     let lines = f.lines().collect::<Result<Vec<_>, _>>().unwrap();
     lex_lines(lines.into_iter())

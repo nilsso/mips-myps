@@ -1,0 +1,12 @@
+tTSDial = d0
+tTMDial = d1
+tTLDial = d2
+pTSDial = d3
+pTMDial = d4
+pTLDial = d5
+
+loop:
+    yield()
+    tT = (tTSDial.Setting + 10 * tTMDial.Setting + 100* tTLDial.Setting)
+    pT = (pTSDial.Setting + 10 * pTMDial.Setting + 100* pTLDial.Setting) * 1000
+    db.Setting = tT + pT

@@ -1,9 +1,7 @@
 furnace = d0
 tankC = d1
 tankH = d2
-eFdest = d3
-eCdest = d4
-eHdest = d5
+progressDest = d3
 
 def vF = 1000
 def R  = 8.314
@@ -15,10 +13,26 @@ def ERRORF = 0.01
 def ERRORC = 0.03
 def ERRORH = 0.03
 
+eFdest.Mode = 1 # percentages
+eCdest.Mode = 1
+eHdest.Mode = 1
+
+db.Setting = 0
 loop:
     yield()
     input = db.Setting
-    if input > 0:
+    haveInput = input > 0
+
+    eFdest.On = haveInput
+    eCdest.On = haveInput
+    eHdest.On = haveInput
+
+    fix nR, nHI, nCI
+    if haveInput:
+        eFdest.Setting = 0
+        eCdest.Setting = 0
+        eHdest.Setting = 0
+
         input = trunc(input)
         tT = (input % 1000) * 10
         pT = trunc(input / 1000) * 100
@@ -37,13 +51,10 @@ loop:
         nCI = nI - nHI
 
         fix rF = nF - nR
-
         nC = nCfactor * tankC.TotalMoles
         fix rC = nC - nCI
-
         nH = nHfactor * tankH.TotalMoles
         fix rH = nH - nHI
-
         tag PDLoop:
             yield()
             nF = furnace.TotalMoles
@@ -54,17 +65,11 @@ loop:
             eC = nC - rC
             eH = nH - rH
 
-            FNotDone = (eF > ERRORF)
-            CNotDone = (eC > ERRORC)
-            HNotDone = (eH > ERRORH)
+            eFdest.Setting = (1 - eF / nR )
+            eCdest.Setting = (1 - eC / nCI)
+            eHdest.Setting = (1 - eH / nHI)
 
-            eFdest.Setting = FNotDone ? eF : 0
-            #eFdest.On     = FNotDone ? eF : 0
-            eCdest.Setting = FNotDone ? eC : 0
-            #eCdest.On     = FNotDone ? eC : 0
-            eHdest.Setting = CNotDone ? eH : 0
-            #eHdest.On     = CNotDone ? eH : 0
+            loop = eF > ERRORF or eC > ERRORC or eH > ERRORH
+            bnez(loop, PDLoop)
 
-            bnez(FNotDone, PDLoop)
-            bnez(CNotDone, PDLoop)
-            bnez(HNotDone, PDLoop)
+        db.Setting = 0
