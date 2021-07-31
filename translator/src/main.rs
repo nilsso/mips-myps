@@ -40,8 +40,11 @@ fn main() {
     #[rustfmt::skip]
         let mips = mips
         .optimize(OptimizationConfig {
-            remove_comments: true,
-            // remove_comments: false,
+            optimize_registers: true,
+            // optimize_registers: false,
+
+            // remove_comments: true,
+            remove_comments: false,
 
             remove_empty: true,
             // remove_empty: false,
@@ -60,9 +63,6 @@ fn main() {
 
             remove_tags: true,
             // remove_tags: false,
-
-            optimize_registers: true,
-            // optimize_registers: false,
         },
         )
         .unwrap();

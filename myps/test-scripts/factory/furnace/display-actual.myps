@@ -1,0 +1,27 @@
+tankC     = d0
+tankH     = d1
+tTMinDisp = d2
+tTMaxDisp = d3
+tFDisp    = d4
+pFDisp    = d5
+
+def AdvancedFurnace = 545937711
+
+def BLUE   = 0
+def RED    = 4
+def YELLOW = 5
+
+tTMinDisp.On    = 1
+tTMaxDisp.On    = 1
+tFDisp.On       = 1
+pFDisp.On       = 1
+tTMinDisp.Color = BLUE
+tTMaxDisp.Color = RED
+tFDisp.Color    = YELLOW
+pFDisp.Color    = YELLOW
+loop:
+    yield()
+    tTMinDisp.Setting = tankC.Temperature
+    tTMaxDisp.Setting = tankH.Temperature
+    tFDisp.Setting    = AdvancedFurnace.all.Temperature.avg
+    pFDisp.Setting    = AdvancedFurnace.all.Pressure.avg

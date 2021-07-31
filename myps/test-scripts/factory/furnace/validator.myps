@@ -1,0 +1,77 @@
+inputControl   = d0
+tTStagingDisp  = d1
+pTStagingDisp  = d2
+tankC          = d3
+tankH          = d4
+furnaceControl = d5
+
+def AdvancedFurnace = 545937711
+
+def vF = 1000
+def R  = 8.31446261815324
+
+def GREEN = 2
+def BLUE  = 0
+def RED   = 4
+def GRAY  = 1
+def ORANGE = 3
+
+def PMin = 0
+def PMax = 60000
+
+def ErrorTMin = -1 # if target temp < cold source temp
+def ErrorTMax = -2 # if target temp > hot source temp
+def ErrorPMin = -3 # if target pressure < minimum (0)
+def ErrorPMax = -4 # if target pressure > maximum (60,000)
+def ErrorCMoles = -5 # if cold source doesn't have enough moles
+def ErrorHMoles = -6 # if hot source doesn't have enough moles
+
+loop:
+    yield()
+    targetCode = inputControl.Setting
+    tT = (targetCode % 1000) * 10
+    pT = trunc(targetCode / 1000) * 100
+
+    tC = tankC.Temperature
+    tH = tankH.Temperature
+
+    if tT < tC:
+        db.Setting = ErrorTMin
+        tTStagingDisp.Color = BLUE
+        pTStagingDisp.Color = BLUE
+    elif tT > tH:
+        db.Setting = ErrorTMax
+        tTStagingDisp.Color = RED
+        pTStagingDisp.Color = RED
+    elif pT < PMin:
+        db.Setting = ErrorPMin
+        tTStagingDisp.Color = ORANGE
+        pTStagingDisp.Color = ORANGE
+    elif pT > PMax:
+        db.Setting = ErrorPMax
+        tTStagingDisp.Color = ORANGE
+        pTStagingDisp.Color = ORANGE
+    else:
+        nF = AdvancedFurnace.all.TotalMoles.avg
+        tF = AdvancedFurnace.all.Temperature.avg
+        nT = pT * vF / (R * tT)
+        nRC = nT * (tT - tH) / (tH - tF) + nF
+        nRH = nT * (tT - tC) / (tC - tF) + nF
+        nR = max(0, max(nRC, nRH))
+        nI = nT - nF + nR
+        tI = (tT * nT - tF * (nF - nR)) / nI
+        nHI = nI * (tC - tI) / (tC - tH)
+        nCI = nI - nHI
+
+        if nCI > tankC.TotalMoles:
+            db.Setting = ErrorCMoles
+            tTStagingDisp.Color = GRAY
+            pTStagingDisp.Color = GRAY
+        if nHI > tankH.TotalMoles:
+            db.Setting = ErrorHMoles
+            tTStagingDisp.Color = GRAY
+            pTStagingDisp.Color = GRAY
+        else:
+            db.Setting = targetCode
+            tTStagingDisp.Color = GREEN
+            pTStagingDisp.Color = GREEN
