@@ -1,24 +1,28 @@
-importantStartButton = d0
+# importantStartButton = d0
 validatorControl     = d1
 furnaceControl       = d2
 tTDisp               = d3
 pTDisp               = d4
 progressDisp         = d5
 
+def ImportantButton = 1668452680
+
 def BLUE  = 0
 def GREEN = 2
 
-tTDisp.Color       = GREEN
-pTDisp.Color       = GREEN
-progressDisp.Color = BLUE
-progressDisp.Mode  = 1
+tTDisp.Color         = GREEN
+pTDisp.Color         = GREEN
+progressDisp.Color   = BLUE
+progressDisp.Mode    = 1
+progressDisp.Setting = 0
 
+fix i = 0
 loop:
     yield()
     targetCode = validatorControl.Setting
-    importantStartButton.On = (targetCode > 0)
+    ImportantButton.all.On = (targetCode > 0)
 
-    if importantStartButton.Setting and furnaceControl.Setting == -1:
+    if ImportantButton.all.On.min and ImportantButton.all.Setting.max and furnaceControl.Setting == -1:
         tT = (targetCode % 1000) * 10
         pT = trunc(targetCode / 1000) * 100
 
@@ -34,10 +38,12 @@ loop:
         while furnaceControl.Setting != -1:
             progressDisp.Setting = furnaceControl.Setting
             yield()
-        pTDisp.On       = 0
-        tTDisp.On       = 0
         progressDisp.On = 0
+        progressDisp.Setting = 0
+        i = 6
     else:
-        tTDisp.On       = 0
-        pTDisp.On       = 0
-        progressDisp.On = 0
+        if i == 0:
+            tTDisp.On       = 0
+            pTDisp.On       = 0
+        else:
+            i -= 1

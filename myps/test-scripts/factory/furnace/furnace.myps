@@ -29,25 +29,24 @@ def nHfactor = (6100) / 6000
 
 # (NOTE: MAY NEED TO ADJUST)
 # PD (proportional, derivative) term coefficients
-# (furnace)
-def kPF = 0.09
-def kDF = 0.06
-# (cold source)
-def kPC = 0.09
-def kDC = 0.06
-# (hot source)
-def kPH = 0.09
-def kDH = 0.06
+def kPF = 0.01
+def kDF = 0
+def kPC = 0.1
+def kDC = 0
+def kPH = 0.1
+def kDH = 0
 
 # Acceptable error amounts for
 # (a) the removal of gas from the furnace,
 # (b) the transfer of cold CO2 (i.e. removal from source)
 # (c) the transfer of hot CO2
-def ERRORF = 0.5
-def ERRORC = 0.5
-def ERRORH = 0.5
+def ERRORF = 0.25
+def ERRORC = 0.25
+def ERRORH = 0.25
 
 db.Setting = -1
+furnace.SettingInput = 0
+furnace.SettingOutput = 0
 loop:
     yield()
     input = db.Setting
@@ -105,8 +104,8 @@ loop:
                 # (f.1) Calculate the furnace output control value (uF) and update error (eFPrev)
                 nF = furnace.TotalMoles
                 eF = nF - rF
-                uF = max(0, min(100, (kPF * eF) + (kDF * (eF - eFPrev) / dt))) # (kPF, kDF)
-                #uF = (kPF * eF) + (kDF * (eF - eFPrev) / dt) # (kPF, kDF)
+                #uF = max(0, min(100, (kPF * eF) + (kDF * (eF - eFPrev) / dt))) # (kPF, kDF)
+                uF = (kPF * eF) + (kDF * (eF - eFPrev) / dt) # (kPF, kDF)
                 eFPrev = eF
 
                 # (f.2) Calculate the cold source control value (uC) and update error (eCPrev)
@@ -125,7 +124,7 @@ loop:
 
                 # (f.4) Set housing to current progress (total error / initial error)
                 eTotal = (eF + eC + eH) / eTotal0
-                db.Setting = 1 - eTotal # set progress
+                db.Setting = 1.05 - eTotal
 
                 # (f.5) Set rates from control values, and loop if any error is above limit
                 FNotDone = (eF > ERRORF)
@@ -133,7 +132,7 @@ loop:
                 HNotDone = (eH > ERRORH)
 
                 furnace.SettingOutput = FNotDone ? uF : 0
-                furnace.SettingInput  = FNotDone ? 0  : 1000
+                #furnace.SettingInput  = FNotDone ? 0  : 1000
                 nCPump.Setting        = CNotDone ? uC : 0
                 nHPump.Setting        = HNotDone ? uH : 0
 
