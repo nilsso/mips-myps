@@ -12,8 +12,8 @@ def R  = 8.31446261815324
 
 # (NOTE: ADJUST PER SETUP)
 # Source volume-mole factor
-def nCfactor = (6100) / 6000
-def nHfactor = (6100) / 6000
+def nCfactor = (50100) / 50000
+def nHfactor = (50100) / 50000
 
 def GREEN = 2
 def BLUE  = 0
@@ -24,10 +24,10 @@ def ORANGE = 3
 def PMin = 0
 def PMax = 60000
 
-def ErrorTMin = -1 # if target temp < cold source temp
-def ErrorTMax = -2 # if target temp > hot source temp
-def ErrorPMin = -3 # if target pressure < minimum (0)
-def ErrorPMax = -4 # if target pressure > maximum (60,000)
+def ErrorTMin   = -1 # if target temp < cold source temp
+def ErrorTMax   = -2 # if target temp > hot source temp
+def ErrorPMin   = -3 # if target pressure < minimum (0)
+def ErrorPMax   = -4 # if target pressure > maximum (60,000)
 def ErrorCMoles = -5 # if cold source doesn't have enough moles
 def ErrorHMoles = -6 # if hot source doesn't have enough moles
 
@@ -45,42 +45,50 @@ loop:
     tH = tankH.Temperature
 
     if tT < tC:
-        db.Setting = ErrorTMin
+        #db.Setting = ErrorTMin
         tTStagingDisp.Color = BLUE
         pTStagingDisp.Color = BLUE
     elif tT > tH:
-        db.Setting = ErrorTMax
+        #db.Setting = ErrorTMax
         tTStagingDisp.Color = RED
         pTStagingDisp.Color = RED
     elif pT < PMin:
-        db.Setting = ErrorPMin
+        #db.Setting = ErrorPMin
         tTStagingDisp.Color = ORANGE
         pTStagingDisp.Color = ORANGE
     elif pT > PMax:
-        db.Setting = ErrorPMax
+        #db.Setting = ErrorPMax
         tTStagingDisp.Color = ORANGE
         pTStagingDisp.Color = ORANGE
     else:
         nF = AdvancedFurnace.all.TotalMoles.avg
         tF = AdvancedFurnace.all.Temperature.avg
         nT = pT * vF / (R * tT)
-        nRC = nT * (tT - tH) / (tH - tF) + nF
-        nRH = nT * (tT - tC) / (tC - tF) + nF
-        nR = max(0, max(nRC, nRH))
+        nRC = (tT - tH) / (tH - tF)
+        nRH = (tT - tC) / (tC - tF)
+        nR = max(0, nT * max(nRC, nRH) + nF)
         nI = nT - nF + nR
         tI = (tT * nT - tF * (nF - nR)) / nI
         nHI = nI * (tC - tI) / (tC - tH)
         nCI = nI - nHI
 
-        if nCI > nCfactor * tankC.TotalMoles:
-            db.Setting = ErrorCMoles
+        nC = nCfactor * tankC.TotalMoles
+        nH = nHfactor * tankH.TotalMoles
+
+        db.Setting = nH
+        sleep(1)
+        db.Setting = nHI
+        sleep(1)
+
+        if nCI > nC:
+            #db.Setting = ErrorCMoles
             tTStagingDisp.Color = GRAY
             pTStagingDisp.Color = GRAY
-        if nHI > nHfactor * tankH.TotalMoles:
-            db.Setting = ErrorHMoles
+        elif nHI > nH:
+            #db.Setting = ErrorHMoles
             tTStagingDisp.Color = GRAY
             pTStagingDisp.Color = GRAY
         else:
-            db.Setting = targetCode
+            #db.Setting = targetCode
             tTStagingDisp.Color = GREEN
             pTStagingDisp.Color = GREEN
