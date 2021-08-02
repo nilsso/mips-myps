@@ -50,49 +50,56 @@ loop:
 
         # (a) unpack input target temperature and pressure (tT/pT)
         input = trunc(input)
-        tT = (input % 1000) * 10
-        pT = trunc(input / 1000) * 100
+        tT = (input % 1000) * 10 # tT
+        pT = trunc(input / 1000) * 100 # pT
 
         # (b) read furnace moles and temperature (nF/tF)
-        nF = furnace.TotalMoles
-        tF = furnace.Temperature
 
         # (c) read tank temperatures (tC/tH)
-        tC = tankC.Temperature
-        tH = tankH.Temperature
 
         # (d) calculate moles to remove and add from C and H (nR/nCI/nHI)
-        nT = pT * vF / (R * tT)
-        nRC = (tT - tH) / (tH - tF)
-        nRH = (tT - tC) / (tC - tF)
+        nT = (pT * vF) / (R * tT) # nT = (pT*vF)/(R*tT)
 
-        nR = max(0, nT * max(nRC, nRH) + nF)
-        fix NF = nF - nR
-        eF = nF - NF
+        tF = furnace.Temperature # tF
+        tH = tankH.Temperature # tH
 
-        nI = nT - nF + nR
-        tI = (tT * nT - tF * (nF - nR)) / nI
+        nRC = (tT - tH) / (tH - tF) # nRC = (tT-tH)/(tH-tF)
 
-        nHI = nI * (tC - tI) / (tC - tH)
-        nH = nHfactor * tankH.TotalMoles
-        fix NH = nH - nHI
-        eH = nH - NH
+        tC = tankC.Temperature # tC
+        nRH = (tT - tC) / (tC - tF) # nRH = (tT-tC)/(tC-tF)
 
-        nCI = nI - nHI
-        nC = nCfactor * tankC.TotalMoles
-        fix NC = nC - nCI
-        eC = nC - NC
+        nF = furnace.TotalMoles # nF
+
+        nR = max(0, nT * max(nRC, nRH) + nF) # nR = max(0, nT*max(nRC, nRH)+nF)
+        fix NF = nF - nR # NF = nF-nR
+        eF = nF - NF # eF = nF-NF
+
+        nI = nT - nF + nR # nI = nT-nF+nR
+        tI = (tT * nT - tF * (nF - nR)) / nI # tI = (tT*nT-tF*(nF-nR))/nI
+
+        nCI = max(0, nI * (tI - tH) / (tC - tH)) # nCI = max(0,nI*(tI-tH)/(tC-tH))
+        nC = nCfactor * tankC.TotalMoles # nC
+        fix NC = nC - nCI # NC = nC-nCI
+        eC = nC - NC # eC = nC-NC
+
+        nHI = nI - nCI # nHI = nI-nCI
+        nH = nHfactor * tankH.TotalMoles # nH
+        fix NH = nH - nHI # NH = nH-nHI
+        eH = nH - NH # eH = nH-NH
 
         eTotal0 = eF + eC + eH
 
         fix i = 0
         loop:
-            if i == 0:
-                db.Setting = trunc(nR) * 10
-            elif i == 1:
-                db.Setting = trunc(nC) * 10 + 1
-            else:
-                db.Setting = trunc(nH) * 10 + 2
+            if i == 0: # if i == 0
+                db.Setting = 30
+                #db.Setting = trunc(nR) * 10
+            elif i == 1: # if i == 1
+                db.Setting = 41
+                #db.Setting = trunc(nC) * 10 + 1
+            else: # else
+                db.Setting = 52
+                #db.Setting = trunc(nH) * 10 + 2
             i = (i + 1) % 3
             sleep(1)
 

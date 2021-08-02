@@ -122,12 +122,24 @@ pub fn lex_lines<'a>(line_iter: impl Iterator<Item = String>) -> MypsResult<Item
                 if matches!(items[i], Item::Block(..)) {
                     if items[i].is_if_elif_else() {
                         let j = i + 1;
+                        println!("({}) VALIDATE {:?}", i, items[i]);
                         let prev_chain_id = if i > 0 {
-                            items[i - 1].chain_id()
+                            (0..=i - 1).rev().find_map(|j| {
+                                println!("({}) ID SEARCH {:?}", j, items[j]);
+                                items[j].chain_id()
+                            })
+                            // items[i - 1].chain_id()
                         } else {
                             None
                         };
-                        let next_is_elif_else = j < items.len() && items[j].is_elif_else();
+
+                        // Scan for next if-elif-else block (skipping Stmt::Empty)
+                        let next_is_elif_else = (j..items.len())
+                            .find_map(|k| {
+                                items[k].is_not_empty().then_some(items[k].is_elif_else())
+                            })
+                            .unwrap_or(false);
+
                         match &mut items[i] {
                             Item::Block(
                                 Block {
@@ -137,7 +149,8 @@ pub fn lex_lines<'a>(line_iter: impl Iterator<Item = String>) -> MypsResult<Item
                                 ..,
                             ) => {
                                 if next_is_elif_else {
-                                    *chain_id_opt = Some(*next_chain_id);
+                                    let id = *next_chain_id;
+                                    *chain_id_opt = Some(id);
                                     *next_chain_id += 1;
                                 }
                             }
@@ -153,7 +166,7 @@ pub fn lex_lines<'a>(line_iter: impl Iterator<Item = String>) -> MypsResult<Item
                                 },
                                 ..,
                             ) => {
-                                *chain_id = prev_chain_id.unwrap();
+                                *chain_id = prev_chain_id.expect("elif without an if");
                                 if next_is_elif_else {
                                     *end_chain = false;
                                 }
@@ -165,7 +178,7 @@ pub fn lex_lines<'a>(line_iter: impl Iterator<Item = String>) -> MypsResult<Item
                                 },
                                 ..,
                             ) => {
-                                *chain_id = prev_chain_id.unwrap();
+                                *chain_id = prev_chain_id.expect("else without an if");
                             }
                             _ => unreachable!(),
                         }

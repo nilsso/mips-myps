@@ -105,6 +105,14 @@ pub enum Item {
 }
 
 impl Item {
+    pub fn is_empty(&self) -> bool {
+        matches!(self, Self::Stmt(Stmt::Empty, ..))
+    }
+
+    pub fn is_not_empty(&self) -> bool {
+        !self.is_empty()
+    }
+
     pub fn is_if(&self) -> bool {
         match self {
             Self::Block(block, ..) => block.is_if(),
@@ -135,6 +143,7 @@ impl Item {
     }
 
     pub fn chain_id(&self) -> Option<usize> {
+        println!("CHAIN_ID {:?}", self);
         match self {
             Self::Block(
                 Block {
