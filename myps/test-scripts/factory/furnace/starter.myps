@@ -9,13 +9,11 @@ def ImportantButton = 1668452680
 
 def BLUE  = 0
 def GREEN = 2
-def YELLOW = 5
-def RED = 4
 
 tTDisp.Color         = GREEN
 pTDisp.Color         = GREEN
 progressDisp.Color   = BLUE
-progressDisp.Mode    = 0
+progressDisp.Mode    = 1
 progressDisp.Setting = 0
 
 fix i = 0
@@ -38,20 +36,14 @@ loop:
         furnaceControl.Setting = targetCode
         yield()
         while furnaceControl.Setting != -1:
-            progress = furnaceControl.Setting
-            colorCode = progress % 10
-            progress = trunc(progress / 10)
-            progressDisp.Setting = progress
-            color = (colorCode == 0) ? YELLOW : ((colorCode == 1) ? BLUE : RED)
-            progressDisp.Color = color
-
+            progressDisp.Setting = furnaceControl.Setting
             yield()
         progressDisp.On = 0
         progressDisp.Setting = 0
         i = 6
     else:
         if i == 0:
-            tTDisp.On       = 0
-            pTDisp.On       = 0
+            tTDisp.On = 0
+            pTDisp.On = 0
         else:
             i -= 1
