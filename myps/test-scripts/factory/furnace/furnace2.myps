@@ -106,7 +106,7 @@ loop:
         eCp = nC0 - NC
 
         # H moles of input (nHI)
-        nHI = nI - nCI # nHI = nI-nCI
+        nHI = nI - nCI
 
         # H end goal (NH) and initial error (eHp)
         nH0 = fH * tankH.TotalMoles
@@ -120,16 +120,16 @@ loop:
             yield()
 
             # F output rate
-            nF = furnace.TotalMoles # nF
-            eF = nF - NF # eF = nF-NF
+            nF = furnace.TotalMoles
+            eF = nF - NF
             EF = eF > ERRORF
             rF = KPF*(eF * vF / nF) + KDF*(eF - eFp)/dt
             #rF = max(0, min(rFmax, rF)) # optional bound on rate
             furnace.SettingOutput = rF
 
             # C input rate
-            nC = fC * tankC.TotalMoles # nC
-            eC = nC - NC # eC = nC-NC
+            nC = fC * tankC.TotalMoles
+            eC = nC - NC
             EC = eC > ERRORC
             rC = KPC*(eC * vC / nC) + KDC*(eC - eCp)/dt
             #rC = max(0, min(100, rC)) # optional bound on rate
@@ -137,8 +137,8 @@ loop:
             pumpC.On      = EC
 
             # H input rate
-            nH = fH * tankH.TotalMoles # nH
-            eH = nH - NH # eH = nH-NH
+            nH = fH * tankH.TotalMoles
+            eH = nH - NH
             EH = eH > ERRORH
             rH = KPH*(eH * vH / nH) + KDH*(eH - eHp)/dt
             #rH = max(0, min(100, rH)) # optional bound on rate
@@ -147,7 +147,7 @@ loop:
 
             # Write progress to housing and store errors
             # (TODO: This isn't exactly accurate...)
-            eTotal = eF + eC + eH # eTotal = eF+eC+eH
+            eTotal = eF + eC + eH
             db.Setting = 1 - (eTotal / eTotal0)
             eFp = eF
             eCp = eC
