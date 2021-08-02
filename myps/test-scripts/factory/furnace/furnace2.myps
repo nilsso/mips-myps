@@ -8,12 +8,12 @@
 # whatever it is given. If the target temperature is less-than the cold source temperature or
 # greater than the hot source temperature then wackiness will certainly occurr!
 # (I may change this point in the future)
-furnace    = d0
-tankC      = d1
-tankH      = d2
-nCPump     = d3
-nHPump     = d4
-nIAnalyzer = d5
+furnace   = d0
+tankC     = d1
+tankH     = d2
+pumpC     = d3
+pumpH     = d4
+analyzerI = d5
 
 # Constants
 def vF = 1000             # furnace volume
@@ -22,29 +22,20 @@ def dt = 0.5              # time step
 
 # (NOTE: ADJUST PER SETUP)
 # Source volume-mole factor
-# e.g. 6100  = 1 furnace (6000) + 2 pipes (200) L
+# e.g. 6200 = 1 furnace (6000) + 2 pipes (200) L
 # (TODO: Need to implement defines calculated from other defines)
 def vC = 50100
 def vH = 50100
 def nCfactor = (50100) / 50000
 def nHfactor = (50100) / 50000
 
-# (NOTE: MAY NEED TO ADJUST)
-# PD (proportional, derivative) term coefficients
-def kPF = 0.01
-def kDF = 0
-def kPC = 0.1
-def kDC = 0
-def kPH = 0.1
-def kDH = 0
-
 # Acceptable error amounts for
 # (a) the removal of gas from the furnace,
 # (b) the transfer of cold CO2 (i.e. removal from source)
 # (c) the transfer of hot CO2
-def ERRORF = 0.001
-def ERRORC = 0.001
-def ERRORH = 0.001
+def ERRORF = 0.0001
+def ERRORC = 0.0001
+def ERRORH = 0.0001
 
 db.Setting = -1
 furnace.SettingInput = 0
@@ -56,75 +47,92 @@ loop:
         db.Setting = -1
     else:
         db.Setting = 0
-        fix rF, rC, rH
-        tag calcMolesTargets:
-            # (a) unpack input target temperature and pressure (tT/pT)
-            input = trunc(input)
-            tT = (input % 1000) * 10
-            pT = trunc(input / 1000) * 100
 
-            # (b) read furnace moles and temperature (nF/tF)
-            nF = furnace.TotalMoles
-            tF = furnace.Temperature
+        # (a) unpack input target temperature and pressure (tT/pT)
+        input = trunc(input)
+        tT = (input % 1000) * 10
+        pT = trunc(input / 1000) * 100
 
-            # (c) read tank temperatures (tC/tH)
-            tC = tankC.Temperature
-            tH = tankH.Temperature
+        # (b) read furnace moles and temperature (nF/tF)
+        nF = furnace.TotalMoles
+        tF = furnace.Temperature
 
-            # (d) calculate moles to remove and add from C and H (nR/nCI/nHI)
-            nT = pT * vF / (R * tT)
-            nRC = nT * (tT - tH) / (tH - tF) + nF
-            nRH = nT * (tT - tC) / (tC - tF) + nF
-            nR = max(0, max(nRC, nRH))
+        # (c) read tank temperatures (tC/tH)
+        tC = tankC.Temperature
+        tH = tankH.Temperature
 
-            rF = (nF - nR) * R * tF / vF
+        # (d) calculate moles to remove and add from C and H (nR/nCI/nHI)
+        nT = pT * vF / (R * tT)
+        nRC = (tT - tH) / (tH - tF)
+        nRH = (tT - tC) / (tC - tF)
 
-            nI = nT - nF + nR
-            tI = (tT * nT - tF * (nF - nR)) / nI
-            nHI = nI * (tC - tI) / (tC - tH)
+        nR = max(0, nT * max(nRC, nRH) + nF)
+        fix NF = nF - nR
+        eF = nF - NF
 
-            nH = nHfactor * tankH.TotalMoles
-            rH = (nH - nHI) * R * tH / vH
+        nI = nT - nF + nR
+        tI = (tT * nT - tF * (nF - nR)) / nI
 
-            nCI = nI - nHI
+        nHI = nI * (tC - tI) / (tC - tH)
+        nH = nHfactor * tankH.TotalMoles
+        fix NH = nH - nHI
+        eH = nH - NH
 
-            nC = nCfactor * tankC.TotalMoles
-            rC = (nC - nCI) * R * tC / vC
+        nCI = nI - nHI
+        nC = nCfactor * tankC.TotalMoles
+        fix NC = nC - nCI
+        eC = nC - NC
+
+        eTotal0 = eF + eC + eH
+
+        fix i = 0
+        loop:
+            if i == 0:
+                db.Setting = trunc(nR) * 10
+            elif i == 1:
+                db.Setting = trunc(nC) * 10 + 1
+            else:
+                db.Setting = trunc(nH) * 10 + 2
+            i = (i + 1) % 3
+            sleep(1)
 
         # TODO: These rates are all fucked up
         tag MolesLoop:
             yield()
-            pF = furnace.Pressure
-            eF = pF - rF
-            vF = max(0, min(1000, eF))
-            FNotDone = eF > ERRORF
-            furnace.SettingOutput = FNotDone ? vF : 0
 
-            pC = tankC.Pressure
-            eC = pC - rC
-            vC = max(0, min(1000, eC))
-            CNotDone = eC > ERRORC
-            nCPump.Setting = CNotDone ? vC : 0
-            nCPump.On      = CNotDone ? 1  : 0
+            nF = furnace.TotalMoles
+            eF = nF - NF
+            FOk = eF > ERRORF
+            rF = FOk ? (max(0, min(100, vF * eF / nF)) * dt) : 0
+            furnace.SettingOutput = rF
 
-            pH = tankH.Pressure
-            eH = pH - rH
-            vH = max(0, min(1000, eH))
-            db.Setting = eH
-            HNotDone = (eH > ERRORH)
-            nHPump.Setting = HNotDone ? vH : 0
-            nHPump.On      = HNotDone ? 1  : 0
+            nC = nCfactor * tankC.TotalMoles
+            eC = nC - NC
+            COk = eC > ERRORC
+            rC = COk ? (max(0, min(100, vC * eC / nC)) * dt) : 0
+            pumpC.Setting = rC
+            pumpC.On      = rC
 
-            bnez(FNotDone, MolesLoop)
-            bnez(CNotDone, MolesLoop)
-            bnez(HNotDone, MolesLoop)
+            nH = nHfactor * tankH.TotalMoles
+            eH = nH - NH
+            HOk = eH > ERRORH
+            rH = HOk ? (max(0, min(100, vH * eH / nH)) * dt) : 0
+            pumpH.Setting = rH
+            pumpH.On      = rH
+
+            #eTotal = eF + eC + eH
+            #db.Setting = 1 - (eTotal / eTotal0)
+
+            bnez(FOk, MolesLoop)
+            bnez(COk, MolesLoop)
+            bnez(HOk, MolesLoop)
 
         # (g) input the nC and nH gas
         # NOTE: As mentioned previously, furnace.SettingInput is currently unbounded when set by
         # logic. Using this to cheat here and instantly fill the furnace volume from the mixer
         # system by setting the input rate to be equal to the mixer system volume.
         furnace.SettingInput  = 1000
-        while nIAnalyzer.TotalMoles > 0:
+        while analyzerI.TotalMoles > 0:
             yield()
         furnace.SettingInput = 0
 

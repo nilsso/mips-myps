@@ -229,12 +229,6 @@ impl Translator {
                 // is being thrown out, and so we need to decrement next_index.
                 translator.next_index -= 1;
                 let cond_stmt = match cond_stmt {
-                    Stmt::Seq ([_, a, b]) => {
-                        unimplemented!();
-                    }
-                    _ => cond_stmt,
-                };
-                let cond_stmt = match cond_stmt {
                     Stmt::Sap (..)        => unimplemented!(),
                     Stmt::Sapz(..)        => unimplemented!(),
                     Stmt::Sdns([_, d,  ]) => Stmt::Brdse([d,    c]),
