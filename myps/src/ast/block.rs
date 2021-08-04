@@ -32,4 +32,3 @@ impl Block {
         self.branch.is_if_elif_else()
     }
 }
-

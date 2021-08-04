@@ -1,8 +1,8 @@
 use std::{fmt, fmt::Display};
 
-use ast_traits::{AstNode, IntoAst};
-use crate::ast::{RegBase, Num, MipsNode};
+use crate::ast::{MipsNode, Num, RegBase};
 use crate::{Aliases, MipsError, MipsParser, MipsResult, Pair, Rule};
+use ast_traits::{AstNode, IntoAst};
 
 #[derive(Clone, Debug)]
 pub struct LineAbs(pub Num);

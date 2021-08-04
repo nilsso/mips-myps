@@ -1,8 +1,8 @@
 use std::{fmt, fmt::Display};
 
-use ast_traits::{AstNode, AstPair, IntoAst};
-use crate::ast::{MipsNode, RegLit, RegBase, FixMode};
+use crate::ast::{FixMode, MipsNode, RegBase, RegLit};
 use crate::{Aliases, MipsError, MipsParser, MipsResult, Pair, Rule};
+use ast_traits::{AstNode, AstPair, IntoAst};
 
 #[derive(Copy, Clone, Debug)]
 pub struct DevLit {
@@ -12,7 +12,10 @@ pub struct DevLit {
 
 impl DevLit {
     pub fn new(index: usize, indirections: usize) -> Self {
-        Self { index, indirections }
+        Self {
+            index,
+            indirections,
+        }
     }
 }
 
@@ -26,7 +29,10 @@ impl<'i> AstNode<'i, Rule, MipsParser, MipsError> for DevLit {
             Rule::dev => {
                 let indirections = pair.as_str().bytes().filter(|b| *b == b'r').count();
                 let index = pair.only_inner()?.as_str().parse()?;
-                Ok(Self { index, indirections })
+                Ok(Self {
+                    index,
+                    indirections,
+                })
             }
             _ => Err(MipsError::pair_wrong_rule("a literal device", pair)),
         }
@@ -74,7 +80,6 @@ impl<'i> AstNode<'i, Rule, MipsParser, MipsError> for DevBase {
     }
 }
 
-
 impl Display for DevBase {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
@@ -94,9 +99,7 @@ impl Dev {
     pub fn reduce(self, aliases: &Aliases) -> MipsResult<Self> {
         match self {
             Self::Base(..) => Ok(self),
-            Self::Alias(key) => {
-                Ok(Self::Base(aliases.try_get_dev_base(&key)?))
-            },
+            Self::Alias(key) => Ok(Self::Base(aliases.try_get_dev_base(&key)?)),
         }
     }
 }
@@ -122,8 +125,15 @@ impl From<DevLit> for Dev {
 impl<'i> MipsNode<'i> for Dev {
     fn as_reg_base(&self) -> Option<RegBase> {
         match self {
-            &Self::Base(DevBase::Lit(DevLit { index, indirections })) if indirections > 0 => {
-                let reg_lit = RegLit { index, indirections, fix_mode: FixMode::None };
+            &Self::Base(DevBase::Lit(DevLit {
+                index,
+                indirections,
+            })) if indirections > 0 => {
+                let reg_lit = RegLit {
+                    index,
+                    indirections,
+                    fix_mode: FixMode::None,
+                };
                 Some(RegBase::Lit(reg_lit))
             }
             _ => None,

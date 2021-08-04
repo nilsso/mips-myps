@@ -1,5 +1,5 @@
 use std::collections::{BTreeMap, BTreeSet};
-use std::{ fmt, fmt::Debug};
+use std::{fmt, fmt::Debug};
 
 use itertools::join;
 
@@ -131,5 +131,3 @@ impl Graph {
         unreachable!();
     }
 }
-
-

@@ -77,7 +77,11 @@ pub enum RegBase {
 impl RegBase {
     pub fn new_lit(index: usize, indirections: usize, fixed: bool) -> Self {
         let fix_mode = fixed.into();
-        Self::Lit(RegLit { index, indirections, fix_mode })
+        Self::Lit(RegLit {
+            index,
+            indirections,
+            fix_mode,
+        })
     }
 
     pub fn index(&self) -> usize {
@@ -137,7 +141,7 @@ impl<'i> AstNode<'i, Rule, MipsParser, MipsError> for RegBase {
                     _ => {
                         let reg_lit = pair.try_into_ast()?;
                         Ok(Self::Lit(reg_lit))
-                    },
+                    }
                 }
             }
             _ => Err(MipsError::pair_wrong_rule("a base register", pair)),
@@ -158,10 +162,7 @@ impl Display for RegBase {
 #[derive(Clone, Debug)]
 pub enum Reg {
     Base(RegBase),
-    Alias {
-        key: String,
-        fixed: bool,
-    },
+    Alias { key: String, fixed: bool },
 }
 
 impl Reg {
@@ -217,7 +218,7 @@ impl<'i> MipsNode<'i> for Reg {
 
     fn as_alias(&self) -> Option<&String> {
         match self {
-            Self::Alias {key, .. } => Some(key),
+            Self::Alias { key, .. } => Some(key),
             _ => None,
         }
     }
@@ -253,7 +254,7 @@ impl<'i> AstNode<'i, Rule, MipsParser, MipsError> for Reg {
                 let key = pair.as_str().to_owned();
                 let fixed = false;
                 Ok(Self::Alias { key, fixed })
-            },
+            }
             _ => Err(MipsError::pair_wrong_rule("a register", pair)),
         }
     }

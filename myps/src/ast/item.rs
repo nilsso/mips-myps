@@ -143,7 +143,6 @@ impl Item {
     }
 
     pub fn chain_id(&self) -> Option<usize> {
-        println!("CHAIN_ID {:?}", self);
         match self {
             Self::Block(
                 Block {
@@ -158,8 +157,8 @@ impl Item {
                     ..
                 },
                 ..,
-            ) |
-            Self::Block(
+            )
+            | Self::Block(
                 Block {
                     branch: Branch::Else { chain_id, .. },
                     ..

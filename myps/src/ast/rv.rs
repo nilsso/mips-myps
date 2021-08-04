@@ -24,7 +24,10 @@ impl<'i> AstNode<'i, Rule, MypsParser, MypsError> for Rv {
             Rule::expr => Ok(Self::Expr(pair.try_into_ast().unwrap())),
             Rule::dev => Ok(Self::Dev(pair.try_into_ast().unwrap())),
             Rule::var => Ok(Self::Var(pair.try_into_ast().unwrap())),
-            _ => Err(MypsError::pair_wrong_rule("an r-value (device or expression)", pair)),
+            _ => Err(MypsError::pair_wrong_rule(
+                "an r-value (device or expression)",
+                pair,
+            )),
         }
     }
 }

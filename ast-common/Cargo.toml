@@ -9,4 +9,6 @@ name = "ast_common"
 [dependencies]
 ast-traits = { path = "../ast-traits" }
 pest = "*"
+lazy_static = "*"
+maplit = "*"
 

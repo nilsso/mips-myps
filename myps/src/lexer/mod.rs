@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
-use std::path::PathBuf;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
+use std::path::PathBuf;
 
 use maplit::btreemap;
 use pest::Parser;
@@ -118,16 +118,11 @@ pub fn lex_lines<'a>(line_iter: impl Iterator<Item = String>) -> MypsResult<Item
         if let Item::Block(block, ..) = item {
             let items = &mut block.items;
             for i in 0..items.len() {
-
                 if matches!(items[i], Item::Block(..)) {
                     if items[i].is_if_elif_else() {
                         let j = i + 1;
-                        println!("({}) VALIDATE {:?}", i, items[i]);
                         let prev_chain_id = if i > 0 {
-                            (0..=i - 1).rev().find_map(|j| {
-                                println!("({}) ID SEARCH {:?}", j, items[j]);
-                                items[j].chain_id()
-                            })
+                            (0..=i - 1).rev().find_map(|j| items[j].chain_id())
                             // items[i - 1].chain_id()
                         } else {
                             None
@@ -205,21 +200,21 @@ pub fn lex_lines<'a>(line_iter: impl Iterator<Item = String>) -> MypsResult<Item
         match line_item {
             LineItemMut::Branch(_) => {
                 // unimplemented!();
-            },
+            }
             LineItemMut::Stmt(stmt) => {
                 match stmt {
                     Stmt::Fix(names) => {
                         for name in names.iter() {
                             fixed_map.insert(name.clone(), true);
                         }
-                    },
+                    }
                     Stmt::Asn(Lv::Var(Var { key, fixed }), _) => {
                         *fixed = *fixed || *fixed_map.get(key).unwrap_or(&false);
-                    },
-                    _ => {},
+                    }
+                    _ => {}
                 }
                 // unimplemented!();
-            },
+            }
         }
     }
 

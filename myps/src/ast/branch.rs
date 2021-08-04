@@ -30,20 +30,20 @@ pub enum Branch {
 
 impl Branch {
     pub fn is_if(&self) -> bool {
-        matches!(self, Self::If {..})
+        matches!(self, Self::If { .. })
     }
 
     pub fn is_elif(&self) -> bool {
-        matches!(self, Self::Elif {..})
+        matches!(self, Self::Elif { .. })
     }
 
     pub fn is_else(&self) -> bool {
-        matches!(self, Self::Else {..})
+        matches!(self, Self::Else { .. })
     }
 
     pub fn is_if_elif_else(&self) -> bool {
         match self {
-            Self::If {..} | Self::Elif {..} | Self::Else {..} => true,
+            Self::If { .. } | Self::Elif { .. } | Self::Else { .. } => true,
             _ => false,
         }
     }
@@ -71,7 +71,7 @@ impl<'i> AstNode<'i, Rule, MypsParser, MypsError> for Branch {
             }
             Rule::branch_elif => {
                 let cond = pair.only_inner().unwrap().try_into_ast().unwrap();
-                Ok(Self::Elif{
+                Ok(Self::Elif {
                     cond,
                     chain_id: 0, // NOTE: Updated in lexer
                     end_chain: true,
@@ -81,7 +81,7 @@ impl<'i> AstNode<'i, Rule, MypsParser, MypsError> for Branch {
                 Ok(Self::Else {
                     chain_id: 0, // NOTE: Updated in lexer
                 })
-            },
+            }
             Rule::branch_for => {
                 let mut pairs = pair.into_inner();
                 let i = pairs.next_pair().unwrap().try_into_ast().unwrap();

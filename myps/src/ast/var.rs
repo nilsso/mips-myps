@@ -21,7 +21,7 @@ impl<'i> AstNode<'i, Rule, MypsParser, MypsError> for Var {
                 let fixed = matches!(pair.as_rule(), Rule::var_fixed);
                 let key = pair.only_inner().unwrap().try_into_ast().unwrap();
                 Ok(Self { key, fixed })
-            },
+            }
             _ => Err(MypsError::pair_wrong_rule("a variable", pair)),
         }
     }

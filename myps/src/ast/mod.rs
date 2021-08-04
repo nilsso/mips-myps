@@ -1,6 +1,6 @@
 use ast_traits::{AstNode, IntoAst};
-use mips::{Mips, MipsResult, Rule as MipsRule, MipsParser, MipsError};
 use mips::ast::MipsNode;
+use mips::{Mips, MipsError, MipsParser, MipsResult, Rule as MipsRule};
 
 use crate::{MypsError, MypsParser, MypsResult, Pair, Rule};
 // use crate::lexer::MypsLexer;

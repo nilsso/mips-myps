@@ -2,8 +2,8 @@ use std::io::Error as IOError;
 use std::num::{ParseFloatError, ParseIntError};
 use std::{fmt, fmt::Display};
 
+use crate::{Alias, Pair, Rule};
 use ast_traits::AstErrorBase;
-use crate::{Alias, Rule, Pair};
 
 type PegError = pest::error::Error<Rule>;
 
@@ -55,23 +55,15 @@ impl MipsError {
 
     pub fn args_wrong_num(name: &str, expected: usize, found: usize) -> Self {
         Self::ArgsWrongNum(format!(
-                "Instruction '{}' expects {} arguments, found {}",
-                name,
-                expected,
-                found
+            "Instruction '{}' expects {} arguments, found {}",
+            name, expected, found
         ))
     }
 
-    pub fn args_wrong_kinds(
-        name: &str,
-        expected: &'static str,
-        found: &str,
-    ) -> Self {
+    pub fn args_wrong_kinds(name: &str, expected: &'static str, found: &str) -> Self {
         Self::ArgsWrongKinds(format!(
             "Instruction '{}' expects arguments ({}), found ({})",
-            name,
-            expected,
-            found,
+            name, expected, found,
         ))
     }
 }

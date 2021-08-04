@@ -5,7 +5,7 @@ use itertools::join;
 use ast_traits::{AstError, AstNode, AstPair, AstPairs, IntoAst};
 use mips::MipsResult;
 
-use crate::ast::{Expr, Num, Dev};
+use crate::ast::{Dev, Expr, Num};
 use crate::{MypsError, MypsParser, MypsResult, Pair, Pairs, Rule};
 
 #[derive(Clone, Debug)]
@@ -37,7 +37,10 @@ impl<'i> AstNode<'i, Rule, MypsParser, MypsError> for Arg {
             Rule::expr => Ok(Self::Expr(pair.try_into_ast().unwrap())),
             Rule::dev => Ok(Self::Dev(pair.try_into_ast().unwrap())),
             // Rule::var => Ok(Self::Var(pair.try_into_ast().unwrap())),
-            _ => Err(MypsError::pair_wrong_rule("an r-value (device or expression)", pair)),
+            _ => Err(MypsError::pair_wrong_rule(
+                "an r-value (device or expression)",
+                pair,
+            )),
         }
     }
 }

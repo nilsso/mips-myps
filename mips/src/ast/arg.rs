@@ -1,10 +1,8 @@
 use std::{fmt, fmt::Display};
 
-use ast_traits::{AstNode, IntoAst};
-use crate::ast::{
-    Dev, DevBase, LineAbs, LineRel, MipsNode, Num, Reg, RegBase, RegLit,
-};
+use crate::ast::{Dev, DevBase, LineAbs, LineRel, MipsNode, Num, Reg, RegBase, RegLit};
 use crate::{Alias, Aliases, MipsError, MipsParser, MipsResult, Pair, Rule};
+use ast_traits::{AstNode, IntoAst};
 
 #[derive(Clone, Debug)]
 pub enum Arg {

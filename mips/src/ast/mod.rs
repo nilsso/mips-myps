@@ -1,5 +1,5 @@
+use crate::{Mips, MipsError, MipsParser, MipsResult, Rule};
 pub use ast_traits::AstNode;
-use crate::{Mips, MipsResult, Rule, MipsParser, MipsError};
 
 // pub use ast_common::ModeRepr;
 // pub type BatchMode = ast_common::BatchMode;
@@ -64,10 +64,10 @@ pub trait MipsNode<'i>: AstNode<'i, Rule, MipsParser, MipsError> + std::fmt::Deb
 // }
 
 mod dev;
-pub use dev::{DevLit, DevBase, Dev};
+pub use dev::{Dev, DevBase, DevLit};
 
 mod reg;
-pub use reg::{RegLit, RegBase, Reg, FixMode};
+pub use reg::{FixMode, Reg, RegBase, RegLit};
 
 mod num;
 pub use num::{Num, NumLit};

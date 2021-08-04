@@ -16,8 +16,7 @@ impl Num {
         match self {
             Self::Lit(..) | Self::Reg(..) => Ok(self),
             Self::Alias(key) => {
-                let alias = aliases.get(&key)
-                    .ok_or(MipsError::alias_undefined(&key))?;
+                let alias = aliases.get(&key).ok_or(MipsError::alias_undefined(&key))?;
                 match alias {
                     Alias::Num(n) => Ok(Self::Lit(*n)),
                     Alias::Reg(reg_base) => Ok(Self::Reg(reg_base.clone())),

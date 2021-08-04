@@ -1,18 +1,14 @@
 use ast_traits::{AstError, AstNode, AstPair, AstPairs, IntoAst};
 use mips::MipsResult;
 
-use crate::ast::{Expr, Lv, Rv, BinaryOp, Var};
+use crate::ast::{BinaryOp, Expr, Lv, Rv, Var};
 use crate::{MypsError, MypsParser, MypsResult, Pair, Rule};
 
 #[derive(Clone, Debug)]
 pub enum Stmt {
     Fix(Vec<String>),
     Asn(Lv, Rv),
-    SelfAsn {
-        op: BinaryOp,
-        lhs: Var,
-        rhs: Expr
-    },
+    SelfAsn { op: BinaryOp, lhs: Var, rhs: Expr },
     Mips(mips::ast::Stmt),
     Empty,
 }
@@ -26,11 +22,12 @@ impl<'i> AstNode<'i, Rule, MypsParser, MypsError> for Stmt {
         match pair.as_rule() {
             Rule::stmt => pair.only_inner().unwrap().try_into_ast(),
             Rule::stmt_fix => {
-                let names = pair.into_inner()
+                let names = pair
+                    .into_inner()
                     .map(|pair| pair.as_str().to_owned())
                     .collect();
                 Ok(Self::Fix(names))
-            },
+            }
             Rule::stmt_asn => {
                 let mut pairs = pair.into_inner();
                 let lv = pairs.next_pair().unwrap().try_into_ast().unwrap();
@@ -47,11 +44,16 @@ impl<'i> AstNode<'i, Rule, MypsParser, MypsError> for Stmt {
                     Rule::op_s_mul => BinaryOp::Mul,
                     Rule::op_s_div => BinaryOp::Div,
                     Rule::op_s_rem => BinaryOp::Rem,
-                    _ => return Err(MypsError::pair_wrong_rule("a self-assign operator", op_pair)),
+                    _ => {
+                        return Err(MypsError::pair_wrong_rule(
+                            "a self-assign operator",
+                            op_pair,
+                        ))
+                    }
                 };
                 let rhs = pairs.final_pair().unwrap().try_into_ast().unwrap();
                 Ok(Self::SelfAsn { op, lhs, rhs })
-            },
+            }
             Rule::stmt_mips => {
                 use pest::Parser;
 

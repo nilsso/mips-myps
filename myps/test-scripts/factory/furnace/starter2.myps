@@ -1,0 +1,51 @@
+# importantStartButton = d0
+validatorControl     = d1
+furnaceControl       = d2
+tTDisp               = d3
+pTDisp               = d4
+progressDisp         = d5
+
+def ImportantButton = 1668452680
+
+def BLUE  = 0
+def GREEN = 2
+
+tTDisp.Color         = GREEN
+pTDisp.Color         = GREEN
+progressDisp.Color   = BLUE
+progressDisp.Mode    = 1
+progressDisp.Setting = 0
+progressDisp.On = 0
+
+db.Setting = 0
+
+ImportantButton.all.On = 1
+
+fix pressedPrev = 0
+fix currentCode = -1
+loop:
+    yield()
+    targetCode = validatorControl.Setting
+    #ImportantButton.all.On = (targetCode > 0)
+
+    pressed = ImportantButton.all.Setting.max
+    if pressed and pressed != pressedPrev:
+        if targetCode > 0 and targetCode != currentCode:
+            tT = (targetCode % 1000) * 10
+            pT = trunc(targetCode / 1000) * 100
+
+            #ImportantButton.all.On = 0
+            #progressDisp.On = 1
+            tTDisp.Setting  = tT
+            pTDisp.Setting  = pT
+
+            currentCode = targetCode
+        else:
+            currentCode = -1
+
+    pressedPrev = pressed
+    furnaceControl.Setting = currentCode
+    db.Setting = currentCode
+    running = (currentCode != -1)
+    tTDisp.On = running
+    pTDisp.On = running

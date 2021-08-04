@@ -3,9 +3,7 @@ tTStagingDisp  = d1
 pTStagingDisp  = d2
 tankC          = d3
 tankH          = d4
-furnaceControl = d5
-
-def AdvancedFurnace = 545937711
+furnace        = d5
 
 def vF = 1000
 def R  = 8.31446261815324
@@ -15,14 +13,20 @@ def R  = 8.31446261815324
 def nCfactor = (50100) / 50000
 def nHfactor = (50100) / 50000
 
-def GREEN = 2
-def BLUE  = 0
-def RED   = 4
-def GRAY  = 1
+def GREEN  = 2
+def BLUE   = 0
+def RED    = 4
+def GRAY   = 1
 def ORANGE = 3
 
 def PMin = 0
 def PMax = 60000
+
+# Error bounds (should be the same as the furnace)
+def ERRORN = 2
+def ERRORF = 5 # Error on initial furnace gas removal
+def ERRORC = 5 # Error on cold source transfer
+def ERRORH = 5 # Error on hot source transfer
 
 def ErrorTMin   = -1 # if target temp < cold source temp
 def ErrorTMax   = -2 # if target temp > hot source temp
@@ -35,60 +39,66 @@ db.Setting = 0
 loop:
     yield()
     targetCode = inputControl.Setting
-    tT = (targetCode % 1000) * 10
-    pT = trunc(targetCode / 1000) * 100
+    tT = (targetCode % 1000) * 10 # tT
+    pT = trunc(targetCode / 1000) * 100 # pT
 
     tTStagingDisp.Setting = tT
     pTStagingDisp.Setting = pT
 
-    tC = tankC.Temperature
-    tH = tankH.Temperature
+    tC = tankC.Temperature # tC
+    tH = tankH.Temperature # tH
 
     if tT < tC:
-        #db.Setting = ErrorTMin
+        db.Setting = ErrorTMin
         tTStagingDisp.Color = BLUE
         pTStagingDisp.Color = BLUE
     elif tT > tH:
-        #db.Setting = ErrorTMax
+        db.Setting = ErrorTMax
         tTStagingDisp.Color = RED
         pTStagingDisp.Color = RED
     elif pT < PMin:
-        #db.Setting = ErrorPMin
+        db.Setting = ErrorPMin
         tTStagingDisp.Color = ORANGE
         pTStagingDisp.Color = ORANGE
     elif pT > PMax:
-        #db.Setting = ErrorPMax
+        db.Setting = ErrorPMax
         tTStagingDisp.Color = ORANGE
         pTStagingDisp.Color = ORANGE
     else:
-        nF = AdvancedFurnace.all.TotalMoles.avg
-        tF = AdvancedFurnace.all.Temperature.avg
-        nT = pT * vF / (R * tT)
-        nRC = (tT - tH) / (tH - tF)
-        nRH = (tT - tC) / (tC - tF)
-        nR = max(0, nT * max(nRC, nRH) + nF)
-        nI = nT - nF + nR
-        tI = (tT * nT - tF * (nF - nR)) / nI
-        nHI = nI * (tC - tI) / (tC - tH)
-        nCI = nI - nHI
+        tF  = furnace.Temperature # tF
 
-        nC = nCfactor * tankC.TotalMoles
-        nH = nHfactor * tankH.TotalMoles
 
-        db.Setting = nH
-        sleep(1)
-        db.Setting = nHI
-        sleep(1)
+        if abs(tT - tF) > ERRORN:
+            tFtHdelta = tH - tF
+            nRC = (tFtHdelta > ERRORN) ? ((tT - tH) / (tH - tF)) : 0
+            tFtCdelta = tC - tF
+            nRH = (tFtCdelta > ERRORN) ? ((tT - tC) / (tC - tF)) : 0
+            nRC = (tT - tH) / (tH - tF) # nRC
+            nRH = (tT - tC) / (tC - tF) # nRH
+            nF  = furnace.TotalMoles # nF
+            nT  = (pT * vF) / (R * tT) # nT
+            nR  = max(0, nT * max(nRC, nRH) + nF) # nR
+            nI  = nT - nF + nR # nI
+            tI  = (tT * nT - tF * (nF - nR)) / nI # tI
+            nCI = max(0, nI * (tI - tH) / (tC - tH)) # nCI
+            nHI = nI - nCI # nHI
+        else:
+            nCI = 0
+            nHI = 0
 
+        -851746783.all.Setting = nI
+
+        nC = nCfactor * tankC.TotalMoles # nC
+        nH = nHfactor * tankH.TotalMoles # nH
         if nCI > nC:
-            #db.Setting = ErrorCMoles
+            db.Setting = ErrorCMoles
             tTStagingDisp.Color = GRAY
             pTStagingDisp.Color = GRAY
         elif nHI > nH:
-            #db.Setting = ErrorHMoles
+            db.Setting = ErrorHMoles
             tTStagingDisp.Color = GRAY
             pTStagingDisp.Color = GRAY
         else:
-            #db.Setting = targetCode
+            db.Setting = targetCode
             tTStagingDisp.Color = GREEN
             pTStagingDisp.Color = GREEN

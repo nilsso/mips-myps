@@ -373,8 +373,6 @@ impl Translator {
                 shift_scopes(&mut body_lines, cond_stmts.len());
                 // Push backwards jump
                 body_lines.push({
-                    println!("BODY_LINES {} {:?}", body_lines.len(), body_lines);
-                    println!("COND_STMTS {} {:?}", cond_stmts.len(), cond_stmts);
                     let jump_by = -((body_lines.len() + cond_stmts.len()) as i64);
                     let jump_back = Arg::LineRel(jump_by.into());
                     let stmt = Stmt::Jr([jump_back]);
@@ -859,12 +857,7 @@ impl Translator {
                 let (dev_base, dev_stmts) = self.translate_dev(dev).unwrap();
                 let (slot, slot_stmts) = self.translate_num(None, slot).unwrap();
                 let ls_stmt =
-                    Stmt::Ls([
-                        reg_base.into(),
-                        dev_base.into(),
-                        slot.into(),
-                        param.into()
-                    ]);
+                    Stmt::Ls([reg_base.into(), dev_base.into(), slot.into(), param.into()]);
                 let stmts = dev_stmts
                     .into_iter()
                     .chain(slot_stmts.into_iter())
@@ -907,12 +900,7 @@ impl Translator {
                     mode
                 };
                 let (mode, mode_stmts) = self.translate_num(None, mode).unwrap();
-                let lb_stmt = Stmt::Lb([
-                    reg_base.into(),
-                    hash.into(),
-                    param.into(),
-                    mode.into()
-                ]);
+                let lb_stmt = Stmt::Lb([reg_base.into(), hash.into(), param.into(), mode.into()]);
                 let stmts = hash_stmts
                     .into_iter()
                     .chain(mode_stmts.into_iter())
@@ -1070,4 +1058,3 @@ impl Translator {
         }
     }
 }
-

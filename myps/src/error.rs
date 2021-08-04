@@ -41,19 +41,16 @@ impl MypsError {
     }
 
     pub fn func_args_wrong_num(name: &str, expected: usize, found: usize) -> Self {
-        Self::FuncArgsWrongNum(format!("Expected {} arguments for '{}', found {}", expected, name, found))
+        Self::FuncArgsWrongNum(format!(
+            "Expected {} arguments for '{}', found {}",
+            expected, name, found
+        ))
     }
 
-    pub fn func_args_wrong_kinds(
-        name: &str,
-        expected: &'static str,
-        found: &str,
-    ) -> Self {
+    pub fn func_args_wrong_kinds(name: &str, expected: &'static str, found: &str) -> Self {
         Self::FuncArgsWrongKinds(format!(
             "Instruction '{}' expects arguments ({}), found ({})",
-            name,
-            expected,
-            found,
+            name, expected, found,
         ))
     }
 

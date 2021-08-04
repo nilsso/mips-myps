@@ -1,7 +1,7 @@
 use ast_traits::{AstError, AstNode, AstPair, AstPairs, IntoAst};
 use mips::MipsResult;
 
-use crate::ast::{Dev, Expr, Rv, Var, Func, Lv};
+use crate::ast::{Dev, Expr, Func, Lv, Rv, Var};
 use crate::{MypsError, MypsParser, MypsResult, Pair, Pairs, Rule};
 
 #[derive(Clone, Debug)]

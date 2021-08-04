@@ -6,28 +6,16 @@ def NormalDual = -539224550
 def Heavy      = -934345724
 def HeavyDual  = -1545574413
 
-fix dawnAngle, lastOn, h, v
-
 loop: # loop:
     yield()
-    db.Setting = dawnAngle
-    on = sensor.On # on = sensor.On
-    if on != 0: # if on:
-        h = sensor.Horizontal + (offsetDial.Setting * 90) # h = h + (offsetDial.Setting * 90)
-        v = (75 - sensor.Vertical) / 1.5 # v = (75 - sensor.Vertical) / 1.5
-        if lastOn != on: # if lastOn != on:
-            dawnAngle = h # dawnAngle = h
-    else: # else:
-        h = dawnAngle # h = dawnAngle
-        v = 0 # v = 0
-    lastOn = on # lastOn = on
-    tag writeAngles:
-        Normal    .all.Horizontal = h
-        NormalDual.all.Horizontal = h
-        Heavy     .all.Horizontal = h
-        HeavyDual .all.Horizontal = h
-        Normal    .all.Vertical   = v
-        NormalDual.all.Vertical   = v
-        Heavy     .all.Vertical   = v
-        HeavyDual .all.Vertical   = v
+    h = sensor.Horizontal + (offsetDial.Setting * 90)
+    Normal    .all.Horizontal = h
+    NormalDual.all.Horizontal = h
+    Heavy     .all.Horizontal = h
+    HeavyDual .all.Horizontal = h
+    v = (75 - sensor.Vertical) / 1.5
+    Normal    .all.Vertical   = v
+    NormalDual.all.Vertical   = v
+    Heavy     .all.Vertical   = v
+    HeavyDual .all.Vertical   = v
     

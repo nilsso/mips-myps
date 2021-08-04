@@ -1,9 +1,12 @@
 #![feature(stmt_expr_attributes)]
-#![feature(map_into_keys_values)]
 #![feature(bool_to_option)]
 #![feature(map_try_insert)]
 use std::collections::{BTreeMap, BTreeSet};
 use std::convert::TryFrom;
+use std::fs::File;
+use std::io::{BufRead, BufReader};
+use std::iter::IntoIterator;
+use std::path::PathBuf;
 
 use pest::Parser;
 use pest_derive::Parser;
@@ -96,7 +99,8 @@ impl Aliases {
     }
 
     pub fn contains_key(&self, key: &str) -> bool {
-        self.map.contains_key(key)
+        // self.map.contains_key(key) // TODO: Stop-gap lowercase, until a constants table is implemented
+        self.map.contains_key(key) || self.map.contains_key(&key.to_lowercase())
     }
 
     pub fn insert(&mut self, key: String, alias: Alias) -> Option<Alias> {
@@ -104,7 +108,10 @@ impl Aliases {
     }
 
     pub fn get(&self, key: &str) -> Option<&Alias> {
-        self.map.get(key)
+        // self.map.get(key) // TODO: Stop-gap lowercase, until a constants table is implemented
+        self.map
+            .get(key)
+            .or_else(|| self.map.get(&key.to_lowercase()))
     }
 
     pub fn try_get(&self, key: &str) -> MipsResult<&Alias> {
@@ -112,7 +119,7 @@ impl Aliases {
     }
 
     pub fn try_get_dev_base(&self, key: &str) -> MipsResult<DevBase> {
-        let alias = self.try_get(key)?;
+        let alias = self.try_get(key).unwrap();
         match alias {
             Alias::Dev(dev_lit) => Ok(dev_lit.clone()),
             _ => Err(MipsError::alias_wrong_kind("a device", alias)),
@@ -120,14 +127,14 @@ impl Aliases {
     }
 
     pub fn get_reg_base(&self, key: &str) -> MipsResult<Option<RegBase>> {
-        match self.try_get(key)? {
+        match self.try_get(key).unwrap() {
             Alias::Reg(reg_lit) => Ok(Some(reg_lit.clone())),
             _ => Ok(None),
         }
     }
 
     pub fn try_get_reg_base(&self, key: &str) -> MipsResult<RegBase> {
-        let alias = self.try_get(key)?;
+        let alias = self.try_get(key).unwrap();
         match alias {
             Alias::Reg(reg) => Ok(reg.clone()),
             _ => Err(MipsError::alias_wrong_kind("a register", alias)),
@@ -136,6 +143,7 @@ impl Aliases {
 }
 
 // TODO: Probably going to want to have a separate table for constants
+// TODO: REALLY need to add a constants map!
 impl Default for Aliases {
     fn default() -> Self {
         let map = maplit::btreemap! {
@@ -153,6 +161,8 @@ impl Default for Aliases {
             "required".into() => Alias::Num(1.0),
             "recipe".into() => Alias::Num(2.0),
 
+            "horizontal".into() => Alias::Num(20.0),
+            "vertical".into() => Alias::Num(21.0),
         };
         Self { map }
     }
@@ -200,59 +210,79 @@ impl Default for Mips {
 // }
 
 impl Mips {
-    pub fn default_with_source(source: &str) -> Result<Self, String> {
+    pub fn lex_file<P: Into<PathBuf> + std::fmt::Debug>(path: P) -> Result<Self, String> {
+        let path_string = format!("{:?}", path);
+        let f = File::open(path.into()).expect(&path_string);
+        let f = BufReader::new(f);
+        let lines = f.lines().collect::<Result<Vec<_>, _>>().unwrap();
+        // lex_lines(lines.into_iter())
         let mut mips = Self::default();
-        mips.parse_source(source)?;
-        // mips.scopes.push(0..mips.lines.len());
-        mips.lex_lines()?;
+        mips.parse_lines(lines).unwrap();
         Ok(mips)
     }
+
+    // pub fn default_with_source(source: &str) -> Result<Self, String> {
+    //     let mut mips = Self::default();
+    //     mips.parse_source(source)?;
+    //     // mips.scopes.push(0..mips.lines.len());
+    //     mips.lex()?;
+    //     Ok(mips)
+    // }
 
     pub fn default_with_lines(lines: Vec<Line>) -> Result<Self, String> {
         let mut mips = Self::default();
         mips.lines.extend(lines);
         // mips.scopes = scopes;
-        mips.lex_lines()?;
+        mips.lex().unwrap();
         Ok(mips)
     }
 
-    fn parse_source(&mut self, source: &str) -> Result<(), String> {
-        for line in source.trim_end().split("\n") {
-            let pairs = MipsParser::parse(Rule::line, line)
-                .map_err(|err| {
-                    format!(
-                        "(MIPS error) Line parsing error\nLine: \"{}\"\nError: {:?}",
-                        line, err
-                    )
-                })
-                .unwrap();
+    fn parse_line(&mut self, line: &str) -> Result<(), String> {
+        let pairs = MipsParser::parse(Rule::line, line)
+            .map_err(|err| {
+                format!(
+                    "(MIPS error) Line parsing error\nLine: \"{}\"\nError: {:?}",
+                    line, err
+                )
+            })
+            .unwrap();
 
-            let line_pair = pairs
-                .only_pair()
-                .map_err(|err| {
-                    format!(
-                        "(MIPS error) Too many inner pairs\nLine: \"{}\"\nError: {:?}",
-                        line, err
-                    )
-                })
-                .unwrap();
+        let line_pair = pairs
+            .only_pair()
+            .map_err(|err| {
+                format!(
+                    "(MIPS error) Too many inner pairs\nLine: \"{}\"\nError: {:?}",
+                    line, err
+                )
+            })
+            .unwrap();
 
-            let line = line_pair
-                .try_into_ast::<Line>()
-                .map_err(|err| {
-                    format!(
-                        "(MIPS error) Instruction parsing error\nLine: \"{}\"\nError: {}",
-                        line, err
-                    )
-                })
-                .unwrap();
+        let line = line_pair
+            .try_into_ast::<Line>()
+            .map_err(|err| {
+                format!(
+                    "(MIPS error) Instruction parsing error\nLine: \"{}\"\nError: {}",
+                    line, err
+                )
+            })
+            .unwrap();
 
-            self.lines.push(line);
+        self.lines.push(line);
+        Ok(())
+    }
+
+    fn parse_lines<I: IntoIterator<Item = String>>(&mut self, lines: I) -> Result<(), String> {
+        for line in lines.into_iter() {
+            self.parse_line(&line).unwrap();
         }
         Ok(())
     }
 
-    fn lex_lines(&mut self) -> Result<(), String> {
+    // fn parse_source(&mut self, source: &str) -> Result<(), String> {
+    //     self.parse_lines(source.trim_end().split("\n"))
+    // }
+
+    fn lex(&mut self) -> Result<(), String> {
         // Line tag pass
         for (i, line) in self.lines.iter().enumerate() {
             let Line { stmt, .. } = line;
@@ -264,15 +294,16 @@ impl Mips {
         }
         // Variable pass
         for i in 0..self.lines.len() {
-            self.lex_line(i)
-                .map_err(|err| {
-                    let line = &self.lines[i];
-                    format!(
-                        "(MIPS lexer error) Line {}\nLine: {}\nError: {}",
-                        i, line, err
-                    )
-                })
-                .unwrap();
+            self.lex_line(i).unwrap();
+            // self.lex_line(i)
+            //     .map_err(|err| {
+            //         let line = &self.lines[i];
+            //         format!(
+            //             "(MIPS lexer error) Line {}\nLine: {}\nError: {}",
+            //             i, line, err
+            //         )
+            //     })
+            //     .unwrap();
         }
         Ok(())
     }
@@ -294,13 +325,18 @@ impl Mips {
             }
         }
         // Insert aliases and definitions
-        let stmt = &self.lines[i].stmt;
+        let Line { stmt, comment_opt } = &mut self.lines[i];
         match stmt {
             Stmt::Alias([Arg::String(key), Arg::Reg(reg)]) => {
-                let reg_base = match reg {
+                let mut reg_base = match reg {
                     Reg::Base(reg_base) => reg_base.clone(),
-                    Reg::Alias { key, .. } => self.aliases.try_get_reg_base(key)?,
+                    Reg::Alias { key, .. } => self.aliases.try_get_reg_base(key).unwrap(),
                 };
+                if let Some(comment) = comment_opt {
+                    if comment.contains("FIX") {
+                        reg_base.set_fixed(true);
+                    }
+                }
                 let alias = Alias::Reg(reg_base);
                 self.aliases.insert(key.clone(), alias);
                 self.present_aliases.insert(key.clone());
@@ -308,7 +344,7 @@ impl Mips {
             Stmt::Alias([Arg::String(key), Arg::Dev(dev)]) => {
                 let dev_base = match dev {
                     Dev::Base(dev_base) => dev_base.clone(),
-                    Dev::Alias(key) => self.aliases.try_get_dev_base(key)?,
+                    Dev::Alias(key) => self.aliases.try_get_dev_base(key).unwrap(),
                 };
                 let alias = Alias::Dev(dev_base);
                 self.aliases.insert(key.clone(), alias);
@@ -320,8 +356,13 @@ impl Mips {
                 self.present_aliases.insert(key.clone());
             }
             _ => {
-                // if let Some(Arg::Reg(reg)) = stmt.iter_args().next() {
-                // }
+                if let Some(Arg::Reg(Reg::Base(mut reg_base))) = stmt.iter_args_mut().next() {
+                    if let Some(comment) = comment_opt {
+                        if comment.contains("FIX") {
+                            reg_base.set_fixed(true);
+                        }
+                    }
+                }
             }
         }
         Ok(())
@@ -343,8 +384,8 @@ impl Mips {
                 }
             })
             .collect::<BTreeMap<String, usize>>();
-        // println!("TAGS {:#?}", tag_lines);
-        // for lines in mips.lines.
+
+        mips.lex().unwrap();
 
         if conf.optimize_registers {
             let lifetimes = mips.analyze_lifetimes();
@@ -381,7 +422,8 @@ impl Mips {
                 }
             }
         }
-        // Replace statements and arguments
+
+        // Define/alias/tag replacement pass
         for (_i, line) in mips.lines.iter_mut().enumerate() {
             match line {
                 // Replace defines
@@ -419,25 +461,61 @@ impl Mips {
                         comment_opt,
                     };
                 }
-                Line { stmt, .. } => {
-                    for arg in stmt.args_mut().iter_mut().rev() {
-                        match arg {
-                            Arg::LineAbs(LineAbs(num)) if conf.remove_tags => {
-                                if let Some(key) = num.as_alias() {
-                                    let i = tag_lines.get(key).expect(key);
-                                    *num = Num::Lit(*i as f64);
-                                }
-                            }
-                            _ => {},
-                        }
-                    }
-                }
+                Line { .. } => {}
             }
         }
-        // Remove comments
+        // Argument and comment replacement pass
         if conf.remove_comments {
             for line in mips.lines.iter_mut() {
                 line.comment_opt = None;
+
+                for arg in line.stmt.iter_args_mut() {
+                    match arg {
+                        Arg::LineAbs(LineAbs(num)) if conf.remove_tags => {
+                            if let Some(key) = num.as_alias() {
+                                let i = tag_lines.get(key).expect(key);
+                                *num = Num::Lit(*i as f64);
+                            }
+                        }
+                        Arg::Num(num) => {
+                            if let Some(key) = num.as_alias() {
+                                if let Some(alias) = mips.aliases.get(key) {
+                                    match alias {
+                                        Alias::Num(n) => {
+                                            if conf.remove_defines {
+                                                *arg = Arg::Num(Num::Lit(*n));
+                                            }
+                                        }
+                                        Alias::Reg(reg_base) => {
+                                            if conf.remove_reg_aliases {
+                                                *arg = Arg::Reg(Reg::Base(*reg_base));
+                                            }
+                                        }
+                                        Alias::Dev(_) => {
+                                            panic!();
+                                        }
+                                    }
+                                }
+                                // *num = Num::Lit()
+                            }
+                        }
+                        Arg::Reg(Reg::Alias { key, .. }) => {
+                            if conf.remove_reg_aliases {
+                                let reg_base = mips.aliases.try_get_reg_base(key).unwrap();
+                                *arg = Arg::Reg(Reg::Base(reg_base));
+                            }
+                        }
+                        Arg::Dev(Dev::Alias(key)) => {
+                            if conf.remove_dev_aliases {
+                                let dev_base = mips.aliases.try_get_dev_base(key).unwrap();
+                                *arg = Arg::Dev(Dev::Base(dev_base));
+                            }
+                        }
+                        // Arg::String(key) => {
+                        // }
+                        _ => {}
+                    }
+                }
             }
         }
         // Remove empty lines
@@ -522,12 +600,9 @@ impl Mips {
                     }
                 }
                 if let Arg::LineAbs(LineAbs(Num::Lit(n))) = arg {
-                    // println!("LINE ABS i={} j={} n={}", i, j, n);
                     if (i as f64) < *n {
-                    //     println!("DECREMENT");
                         *n -= 1_f64;
                     }
-                    // if i < n
                 }
                 if let Arg::LineRel(LineRel(Num::Lit(n))) = arg {
                     use std::cmp::Ordering::*;
@@ -582,13 +657,70 @@ impl Mips {
         //     res.push(lifetime);
         // }
 
-        let scope_tuple = |i, fix_mode| {
-            match fix_mode {
-                FixMode::None => (i, i),
-                FixMode::Fixed => (0, self.lines.len() - 1),
-                FixMode::Scoped(s, e) => (s, e),
-            }
+        let scope_tuple = |i, fix_mode| match fix_mode {
+            FixMode::None => (i, i),
+            FixMode::Fixed => (0, self.lines.len() - 1),
+            FixMode::Scoped(s, e) => (s, e),
         };
+
+        // Fixed/scoped pass
+        for (i, line) in self.lines.iter().enumerate() {
+            for (arg, reg_lit) in line.stmt.args().iter().rev().filter_map(|arg| {
+                // arg.as_reg_lit()
+                arg.get_reg_lit(self)
+                    .expect(&format!(
+                        "Fatal error analyzing lifetimes\nLINE {}: {:?}\nARG: {:?}",
+                        i, line, arg
+                    ))
+                    .map(|reg_lit| (arg, reg_lit))
+            }) {
+                let RegLit {
+                    index, fix_mode, ..
+                } = reg_lit;
+                if matches!(arg, Arg::Reg(..)) {
+                    match fix_mode {
+                        FixMode::None => {}
+                        FixMode::Fixed | FixMode::Scoped(..) => {
+                            let (s, e) = scope_tuple(i, fix_mode);
+                            if let Some((s_old, e_old)) = lifetimes.get_mut(&index) {
+                                *s_old = s.min(*s_old);
+                                *e_old = e.max(*e_old);
+                            } else {
+                                lifetimes.insert(index, (s, e));
+                            }
+                        }
+                    }
+                    // let ((s, e), replace) = match fix_mode {
+                    //     FixMode::None => ((i, i), true),
+                    //     FixMode::Fixed => ((0, self.lines.len() - 1), false),
+                    //     FixMode::Scoped(s, e) => ((s, e), false),
+                    // };
+                    // // If the register if fixed or scoped (scoped being stronger than fixed),
+                    // // then an existing entry is not replaced; else unfixed, and an existing
+                    // // entry should be replaced. (There shouldn't ever be a time where a smaller
+                    // // scoped register comes before a larger scoped one of the same index.)
+                    // if replace {
+                    //     if let Some(old_lifetime) = lifetimes.insert(index, (s, e, fix_mode)) {
+                    //         res.push((index, old_lifetime));
+                    //     }
+                    // } else {
+                    //     if let Some((s_old, e_old, _)) = lifetimes.get_mut(&index) {
+                    //         *s_old = s.min(*s_old);
+                    //         *e_old = e.max(*e_old);
+                    //     } else {
+                    //         lifetimes.insert(index, (s, e, fix_mode));
+                    //     }
+                    //     // lifetimes.try_insert(index, lifetime).ok();
+                    // }
+                } else {
+                    // As r-value
+                    let (_s, e) = lifetimes.entry(index).or_insert((i, i));
+                    if *e < i {
+                        *e = i;
+                    }
+                }
+            }
+        }
 
         for (i, line) in self.lines.iter().enumerate()
         // NOTE: What was this filter for?
@@ -597,7 +729,10 @@ impl Mips {
             for (arg, reg_lit) in line.stmt.args().iter().rev().filter_map(|arg| {
                 // arg.as_reg_lit()
                 arg.get_reg_lit(self)
-                    .expect(&format!("Fatal error analyzing lifetimes\nARG: {:?}", arg))
+                    .expect(&format!(
+                        "Fatal error analyzing lifetimes\nLINE {}: {:?}\nARG: {:?}",
+                        i, line, arg
+                    ))
                     .map(|reg_lit| (arg, reg_lit))
             }) {
                 let RegLit {
@@ -611,15 +746,7 @@ impl Mips {
                                 res.push((index, old_lifetime));
                             }
                         }
-                        FixMode::Fixed | FixMode::Scoped(..) => {
-                            let (s, e) = scope_tuple(i, fix_mode);
-                            if let Some((s_old, e_old)) = lifetimes.get_mut(&index) {
-                                *s_old = s.min(*s_old);
-                                *e_old = e.max(*e_old);
-                            } else {
-                                lifetimes.insert(index, (s, e));
-                            }
-                        }
+                        FixMode::Fixed | FixMode::Scoped(..) => {}
                     }
                     // let ((s, e), replace) = match fix_mode {
                     //     FixMode::None => ((i, i), true),

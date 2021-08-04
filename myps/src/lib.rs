@@ -13,7 +13,7 @@ use pest::Parser;
 use pest_derive::Parser;
 // use serde::{Deserialize, Serialize};
 
-use ast_traits::{AstRule, AstNode, AstPairs};
+use ast_traits::{AstNode, AstPairs, AstRule};
 
 #[derive(Parser)]
 #[grammar = "grammar.pest"]

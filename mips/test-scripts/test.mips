@@ -1,8 +1,32 @@
-j ahead
+alias sensor d0
+alias offsetDial d1
+
 alias x r0
 alias y r1
-j ahead
-move x 1
-ahead:
-move y 2
-j ahead
+
+define Normal     -2045627372
+define NormalDual -539224550
+define Heavy      -934345724
+define HeavyDual  -1545574413
+
+loop:
+yield
+l x sensor Horizontal
+l y offsetDial Setting
+mul y y 90
+add x x y
+# Calculate horizontal
+sb Normal     Horizontal x
+sb NormalDual Horizontal x
+sb Heavy      Horizontal x
+sb HeavyDual  Horizontal x
+
+# Calculate vertical
+l x sensor Vertical
+sub x 75 x
+div x x 1.5
+sb Normal     Vertical x
+sb NormalDual Vertical x
+sb Heavy      Vertical x
+sb HeavyDual  Vertical x
+j loop

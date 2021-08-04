@@ -197,7 +197,9 @@ def_stmt!(
     (Lr,     "lr",     4, "reg,dev,num,token", [R, D, N, S]),
     (Ls,     "ls",     4, "reg,dev,num,token", [R, D, N, S]),
     (S,      "s",      3, "dev,token,num",     [D, S, N]),
-    (Sb,     "sb",     3, "num,dev,num",       [N, D, N]),
+    // (Sb,     "sb",     3, "num,dev,num",       [N, D, N]),
+    (Sb,     "sb",     3, "num,num,num",       [N, N, N]),
+
 
     // Flow Control, Branches and Jumps
     (Bap,    "bap",    4, "num,num,num,num",   [N, N, N, LA]),
@@ -336,7 +338,7 @@ impl Stmt {
             if let Some(_key) = arg.as_alias() {
                 *arg = arg.clone().reduce(aliases)?;
                 // if !mips.present_aliases.contains(key) {
-                    // *arg = arg.clone().reduce(aliases)?;
+                // *arg = arg.clone().reduce(aliases)?;
                 // }
             }
         }
