@@ -1,4 +1,6 @@
 sensor = d0
+# provides a multiple of 90 offset to the horizontal
+# just to make setting up easier
 offsetDial = d1
 
 def Normal     = -2045627372

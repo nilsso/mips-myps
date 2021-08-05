@@ -1,0 +1,134 @@
+alias WastePump d0
+alias CoolingPump d1
+alias HeatPump d2
+alias Wasteanalyzer d3
+alias SPTemp d4
+alias SPPressure d5
+alias pk r1
+alias tk r2
+alias tw r3
+alias pk1 r4
+alias tk1 r5
+alias vs r6
+alias vo r7
+alias vc r8
+alias vh r9
+alias vw r10
+alias vo r11
+alias tct r12
+alias tc r13
+alias pp r14
+alias th r15
+define InputFactor 0.9
+define OuputFactor 0.9
+define vsMax 100
+define FurnaceHash 545937711
+move th 2500
+move tc 150
+
+Start:
+    yield
+    l tct db Setting
+    lb pk FurnaceHash Pressure 0
+    lb tk FurnaceHash Temperature 0
+    l pk1 SPPressure Setting
+    l tk1 SPTemp Setting
+    l tw Wasteanalyzer Temperature
+    l pp Wasteanalyzer Pressure
+    sgt r0 tct tk
+    select th r0 tct th
+    slt r0 tct tk
+    select tc r0 tct tc
+    move tct th
+    jal CalcTemp
+
+    move vh tct
+    move tct tc
+    jal CalcTemp
+
+    move vc tct
+    sub vs pk1 pk
+    mul vs vs 500
+    div vs vs pp
+    mul vs vs InputFactor
+    sub vs vs vh
+    sub vs vs vc
+    max vs vs 0
+    mul vc vc InputFactor
+    mul vh vh InputFactor
+    move tct th
+
+    jal CalcVE
+    bltz vo c
+    bgt vo vsMax Scale
+    bgt vw vsMax Scale
+    add vh vh vo
+    j Continue
+
+c:
+    move tct tc
+    jal CalcVE
+    bgt vo vsMax Scale
+    bgt vw vsMax Scale
+    add vc vc vo
+
+Continue:
+    min vc vc 100
+    min vh vh 100
+    min vw vw 100
+    add vs vc vh
+    add vs vs vw
+#div vs vs OuputFactor ### VS factor
+    sub vo pk pk1 ###  VO start
+    mul vo vo 500
+    mul r0 pp vs
+    add vo vo r0
+    mul vo vo 500
+    mul vs vs pp
+    mul r0 pk 500
+    add r0 vs r0
+    div vo vo r0
+    mul vo vo OuputFactor
+    min vo vo 100
+    max vo vo 0### vo end
+    lb r0 FurnaceHash On 0
+    s WastePump On r0
+    s HeatPump On r0
+    s CoolingPump On r0
+    s WastePump Setting vw
+    s HeatPump Setting vh
+    s CoolingPump Setting vc
+    sb FurnaceHash SettingOutput vo
+    j Start
+
+Scale:
+    max r0 vo vw
+    div r0 vsMax r0
+    mul vs r0 vs
+
+CalcVE:
+    sub vo tk tw
+    mul vo vo vs
+    mul vo vo tct
+    sub r0 tct tw
+    mul r0 r0 tk
+    div vo vo r0
+    sub vw tct tk #### r0 VW start
+    mul vw vw vs
+    mul vw vw tw
+    sub r0 tct tw
+    mul r0 r0 tk
+    div vw vw r0
+    j ra
+
+CalcTemp:
+    sub r0 tk tk1
+    mul r0 r0 pk
+    mul r0 r0 tct
+    mul r0 r0 500
+    sub tct tk1 tct
+    mul tct tct tk
+    mul tct tct pp
+    div tct r0 tct
+    max tct tct 0
+    j ra

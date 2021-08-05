@@ -3,7 +3,7 @@
 #
 # NOTE: To start operation, write a "value" greater than zero to the housing. This value is taken to
 # be a code for the target temperature and pressure with the format `PPPTTT`, where tT=TTT*10$ and
-# pT=PPP*100.
+# pT=PPP*100. To end operation/put on idle, write -1 to the housing.
 #
 # e.g. 500050 -> tT = 050*10 = 500 K, pT = 500*100 = 50,000 kPa = 50 MPa
 #
@@ -32,53 +32,42 @@ def vH = 50100
 def fC = (50100) / 50000
 def fH = (50100) / 50000
 
-# "PD" term coefficients
-# (NOTE: Tweaking could increase result speed)
-def KPF = 0.5 # Furnace volume proportional term
-def KDF = 0.5 # Furnace volume derivative term
-def KPC = 0.5 # Cold source proportional term
-def KDC = 0.5 # Cold source derivative term
-def KPH = 0.5 # Hot source proportional term
-def KDH = 0.5 # Hot source derivative term
-
 # Error bounds
-def ERRORN = 2
-def ERRORF = 5 # Error on initial furnace gas removal
-def ERRORC = 5 # Error on cold source transfer
-def ERRORH = 5 # Error on hot source transfer
+def ERRORN = 2 # Error on moles approaching target or source
 
 # Pump maximum bounds
 # (NOTE: These are optionally used down the PD loop)
+# (ALSO NOTE: Furnaces are currently unbounded!)
 def rFmax = 100 # Furnace output
 def rCmax = 100 # Cold source pump
 def rHmax = 100 # Hot source pump
 
 # Initialization
 db.Setting = -1
-
 pumpC.On = 1
 pumpH.On = 1
 pumpC.Setting = 0
 pumpH.Setting = 0
 
 loop:
-    if analyzerI.TotalMoles > 0:
+    if analyzerI.TotalMoles > 0: # Input mix
         furnace.SettingInput = 1000
-        yield()
-        furnace.SettingInput = 0
     yield()
+    furnace.SettingInput = 0
+
     input = db.Setting
-    if input <= 0:
+    if input <= 0: # Stop/Idle
         db.Setting = -1
         furnace.SettingOutput = 0
         pumpC.Setting = 0
         pumpH.Setting = 0
-    else:
-        furnace.SettingInput = 0
+    else: # Run
+        # Unpack target temperature and pressure
         input = trunc(input)
         tT  = (input % 1000) * 10
         tF  = furnace.Temperature
 
+        # Calculate nR moles to remove from F (and do undefined checking)
         #if abs(tT - tF) > ERRORN:
         tC  = tankC.Temperature
         tH  = tankH.Temperature
@@ -90,20 +79,25 @@ loop:
         pT  = trunc(input / 1000) * 100
         nT  = (pT * vF) / (R * tT)
         nR  = max(0, nT * max(nRC, nRH) + nF)
+
+        # Calculate nCI moles to add from C and nHI moles to add from H
         nI  = nT - nF + nR
         tI  = (tT * nT - tF * (nF - nR)) / nI
         nCI = max(0, nI * (tI - tH) / (tC - tH))
         nHI = nI - nCI
 
+        # Set output based on ratio of nR in F
         rF = nR * vF / nF * dt
         rF = max(0, min(rFmax, rF))
         furnace.SettingOutput = rF
 
+        # Set C pump based on ratio of nCI in C
         nC  = fC * tankC.TotalMoles
         rC = nCI * vC / nC
         rC = max(0, min(rCmax, rC))
         pumpC.Setting = rC
 
+        # Set H pump based on ratio of nHI in H
         nH  = fH * tankH.TotalMoles
         rH = nHI * vH / nH
         rH = max(0, min(rHmax, rH))
@@ -113,4 +107,4 @@ loop:
         furnace.SettingOutput = 0
         pumpC.Setting = 0
         pumpH.Setting = 0
-    #db.Setting = input
+

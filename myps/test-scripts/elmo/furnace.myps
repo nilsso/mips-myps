@@ -1,0 +1,107 @@
+WastePump = d0
+CoolingPump = d1
+HeatPump = d2
+WasteAnalyzer = d3
+SPTemp = d4
+SPPressure = d5
+
+def InputFactor  = 0.9
+def OutputFactor = 0.9
+def VSMax        = 100
+def FurnaceHash  = 545937711
+
+# alias  pk  r1
+# alias  tk  r2
+# alias  tw  r3
+# alias  pk1 r4
+# alias  tk1 r5
+# alias  vs  r6
+# alias  vo  r7
+# alias  vc  r8
+# alias  vh  r9
+# alias  vw  r10
+# alias  vo  r11
+# alias  tct r12
+# alias  tc  r13
+# alias  pp  r14
+# alias  th  r15
+
+fix pk, tk, tw, pk1, tk1, vs, vo, vc, vh, vw, tct, tc, pp, th
+
+th = 2500
+tc = 150
+
+tag Start:
+    yield()
+    tct = db.Setting
+    pk = FurnaceHash.all.Pressure.0
+    tk = FurnaceHash.all.Temperature.0
+    pk1 = SPPressure.Setting
+    tk1 = SPTemp.Setting
+    tw = WasteAnalyzer.Temperature
+    pp = WasteAnalyzer.Pressure
+    th = (tct > tk) ? tct : th
+    tc = (tct < tk) ? tct : tc
+    tct = th
+    jal(CalcTemp)
+
+    vh = tct
+    tct = tc
+    jal(CalcTemp)
+
+    vc = tct
+    vs = max(0, InputFactor * 500 * (pk1 - pk) / pp - vh - vc)
+    vc = InputFactor * vc
+    vh = InputFactor * vh
+    tct = th
+    jal(CalcVE)
+
+    bltz(vo, c)
+    bgt(vo, VSMax, Scale)
+    bgt(vw, VSMax, Scale)
+    vh += vo
+    j(Continue)
+
+    tag c:
+        tct = tc
+        jal(CalcVE)
+        bgt(vo, VSMax, Scale)
+        bgt(vw, VSMax, Scale)
+        vc += vo
+
+    tag Continue:
+        vc = min(vc, 100)
+        vh = min(vh, 100)
+        vw = min(vw, 100)
+        vs = vc + vh + vw
+        # vs = vs / OutputFactor # VS factor
+        vo  = 500 * (500 * (pk - pk1) + pp * vs)
+        vs *= pp
+        vo  = max(0, min(100, OutputFactor * vo / (500 * pk + vs)))
+
+        furnaceOn       = FurnaceHash.all.On.0
+        WastePump   .On = furnaceOn
+        HeatPump    .On = furnaceOn
+        CoolingPump .On = furnaceOn
+
+        WastePump   .Setting = vw
+        HeatPump    .Setting = vh
+        CoolingPump .Setting = vc
+
+        FurnaceHash.all.SettingOutput = vo
+        j(Start)
+
+    tag Scale:
+        vs *= (VSMax / max(vo, vw))
+
+    tag CalcVE:
+        vo = tct * vs * (tk - tw)
+        vo = vo / (tk * (tct - tw))
+        vw = tw * vs * (tct - tk)
+        vw = vw / (tk * (tct- tw))
+        j(ra)
+
+    tag CalcTemp:
+        tct = max(0, (500 * tct * pk * (tk - tk1)) / (pp * tk * (tk1 - tct)))
+        j(ra)
+

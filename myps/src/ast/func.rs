@@ -129,6 +129,7 @@ def_func!(
     (Abs,   1, "abs",   "expr",      [E   ]),
     (Acos,  1, "acos",  "nexpr",     [E   ]),
     (Asin,  1, "asin",  "expr",      [E   ]),
+    (Atan,  1, "atan",  "expr",      [E   ]),
     (Ceil,  1, "ceil",  "expr",      [E   ]),
     (Cos,   1, "cos",   "expr",      [E   ]),
     (Exp,   1, "exp",   "expr",      [E   ]),
