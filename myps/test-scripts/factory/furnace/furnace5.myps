@@ -11,7 +11,7 @@
 # whatever it is given. If the target temperature is less-than the cold source temperature or
 # greater than the hot source temperature then wackiness will certainly occurr!
 # (I may change this point in the future)
-# 
+#
 # Things to consdier:
 # - If tF~=tT, tF~=tC or tF~=tH then algorithm is undefined
 #
@@ -54,6 +54,10 @@ def KPH = 0.5 # Hot source proportional term
 def ERRORT = 0.5 # Maximum temperature error
 def ERRORP = 0.5 # Maximum pressure error
 
+def ERRORF = 5
+def ERRORC = 5
+def ERRORH = 5
+
 # Pump maximum bounds
 def rFmax = 1000 # Furnace output
 def rCmax = 1000 # Cold source pump
@@ -88,51 +92,65 @@ loop:
 
         # Calculate moles to remove
         nT  = (pT * vF) / (R * tT) # nT
-        nF  = AdvancedFurnace.all.TotalMoles.Sum
-        nR  = max(0, nT * max(nRC, nRH) + nF) # nR
-
-        # Calculate and set furnace output
-        rF   = KPF*(nR * vF / nF) # rF
-        rF   = max(0, min(rFmax, rF))
-        AdvancedFurnace.all.SettingOutput = rF
+        fix nF  = AdvancedFurnace.all.TotalMoles.Sum
+        fix nR  = max(0, nT * max(nRC, nRH) + nF) # nR
 
         # Calculate C and H input moles
         nI  = nT - nF + nR # nI
         tI  = (tT * nT - tF * (nF - nR)) / nI # tI
-        nCI = nI * (tI - tH) / (tC - tH) # nCI
-        nHI = nI - nCI # nHI
+        fix nCI = nI * (tI - tH) / (tC - tH) # nCI
+        fix nHI = nI - nCI # nHI
 
-        # Calculate and set C pump
-        nC = fC * tankC.TotalMoles # nC
-        rC   = KPC*(nCI * vC / nC) # rC
-        rC   = max(0, min(rCmax, rC))
-        pumpC.Setting = rC # set rC
+        AdvancedFurnace.all.SettingInput = 1000
+        fix nC = fC * tankC.TotalMoles
+        fix nH = fH * tankH.TotalMoles
+        tag AddRemoveLoop:
+            rF = KPF*(nR * vF / nF)
+            rF = max(0, min(rFmax, rF))
+            AdvancedFurnace.all.SettingOutput = rF
 
-        # Set H pump
-        nH = fH * tankH.TotalMoles # nH
-        rH   = KPH*(nHI * vH / nH) # rH
-        rH   = max(0, min(rHmax, rH))
-        pumpH.Setting = rH # set rH
+            rC = KPC*(nCI * vC / nC) # rC
+            rC = max(0, min(rCmax, rC))
+            pumpC.Setting = rC # set rC
 
-        # Let C and H pumps run for a tick then input result
-        AdvancedFurnace.all.SettingInput = 0
-        yield()
-        pumpC.Setting = 0
-        pumpH.Setting = 0
+            rH = KPH*(nHI * vH / nH) # rH
+            rH = max(0, min(rHmax, rH))
+            pumpH.Setting = rH # set rH
+
+            yield()
+            nFp  = nF
+            nF   = AdvancedFurnace.all.TotalMoles.Sum
+            nR  -= nFp - nF
+
+            nCp  = nC
+            nC   = fC * tankC.TotalMoles
+            nCI -= nCp - nC
+
+            nHp  = nH
+            nH   = fH * tankH.TotalMoles
+            nHI -= nHp - nH
+
+            bgt(nR,  ERRORF, AddRemoveLoop)
+            bgt(nCI, ERRORC, AddRemoveLoop)
+            bgt(nHI, ERRORH, AddRemoveLoop)
+
         AdvancedFurnace.all.SettingOutput = 0
         AdvancedFurnace.all.SettingInput = 1000
+        pumpC.Setting = 0
+        pumpH.Setting = 0
         #yield()
         while PipeAnalyzer.all.TotalMoles.Sum > 0:
             yield()
 
     elif ratioCO2 < 1.0:
         # Furnace gas filtration
-        pumpC.Setting = 0
-        pumpH.Setting = 0
+        #pumpC.Setting = 0
+        #pumpH.Setting = 0
         AdvancedFurnace.all.SettingInput = 0
         Filtration.all.On = 1
         DigitalValve.all.On = 1
         yield()
+
         AdvancedFurnace.all.SettingOutput = 1000
         while AdvancedFurnace.all.TotalMoles.Sum > 0:
             yield()
@@ -145,10 +163,10 @@ loop:
         AdvancedFurnace.all.SettingInput = 0
         Filtration.all.On = 0
         DigitalValve.all.On = 0
-    else:
-        pumpC.Setting = 0
-        pumpH.Setting = 0
-        AdvancedFurnace.all.SettingOutput = 0
-        AdvancedFurnace.all.SettingInput = 1000
-        yield()
+    #else:
+    #    pumpC.Setting = 0
+    #    pumpH.Setting = 0
+    #    AdvancedFurnace.all.SettingOutput = 0
+    #    AdvancedFurnace.all.SettingInput = 1000
+    #    yield()
 
