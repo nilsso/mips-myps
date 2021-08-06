@@ -1,0 +1,135 @@
+alias WastePump d0
+alias CoolingPump d1
+alias HeatPump d2
+alias WasteAnalyzer d3
+alias SPTemp d4
+alias SPPressure d5
+
+alias pk r0
+alias tk r1
+alias tw r2
+alias pk1 r3
+alias tk1 r4
+alias vs r5
+alias vo r6
+alias vc r7
+alias vh r8
+alias vw r9
+alias tct r10
+alias tc r11
+alias pp r12
+alias th r13
+
+move r13 2500
+move r11 150
+
+Start:
+    yield
+    l r10 db Setting
+    lb r0 545937711 Pressure 0
+    lb r1 545937711 Temperature 0
+    l r3 d5 Setting
+    l r4 d4 Setting
+    l r2 d3 Temperature
+    l r12 d3 Pressure
+    sgt r14 r10 r1
+    select r13 r14 r10 r13
+    slt r14 r10 r1
+    select r11 r14 r10 r11
+    move r10 r13
+    jal CalcTemp
+
+    move r8 r10
+    move r10 r11
+    jal CalcTemp
+
+    move r7 r10
+    mul r14 0.9 500
+    sub r15 r3 r0
+    mul r14 r14 r15
+    div r14 r14 r12
+    sub r14 r14 r8
+    sub r14 r14 r7
+    max r5 0 r14
+    mul r7 0.9 r7
+    mul r8 0.9 r8
+    move r10 r13
+    jal CalcVE
+
+    bltz r6 c
+    bgt r6 100 Scale
+    bgt r9 100 Scale
+    add r8 r8 r6
+    j Continue
+
+c:
+    move r10 r11
+    jal CalcVE
+    bgt r6 100 Scale
+    bgt r9 100 Scale
+    add r7 r7 r6
+
+Continue:
+    min r7 r7 100
+    min r8 r8 100
+    min r9 r9 100
+    add r14 r7 r8
+    add r5 r14 r9
+# vs = vs / OutputFactor # VS factor
+    sub r14 r0 r3
+    mul r14 500 r14
+    mul r15 r12 r5
+    add r14 r14 r15
+    mul r6 500 r14
+    mul r5 r5 r12
+    mul r14 0.9 r6
+    mul r15 500 r0
+    add r15 r15 r5
+    div r14 r14 r15
+    min r14 100 r14
+    max r6 0 r14
+
+    lb r14 545937711 On 0
+    s d0 On r14
+    s d2 On r14
+    s d1 On r14
+
+    s d0 Setting r9
+    s d2 Setting r8
+    s d1 Setting r7
+
+    sb 545937711 SettingOutput r6
+    j Start
+
+Scale:
+    max r14 r6 r9
+    div r14 100 r14
+    mul r5 r5 r14
+
+CalcVE:
+    mul r14 r10 r5
+    sub r15 r1 r2
+    mul r6 r14 r15
+    sub r14 r10 r2
+    mul r14 r1 r14
+    div r6 r6 r14
+    mul r14 r2 r5
+    sub r15 r10 r1
+    mul r9 r14 r15
+    sub r14 r10 r2
+    mul r14 r1 r14
+    div r9 r9 r14
+    j ra
+
+CalcTemp:
+    mul r14 500 r10
+    mul r14 r14 r0
+    sub r15 r1 r4
+    mul r14 r14 r15
+    mul r15 r12 r1
+    sub r16 r4 r10
+    mul r15 r15 r16
+    div r14 r14 r15
+    max r10 0 r14
+    j ra
+

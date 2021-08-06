@@ -423,8 +423,11 @@ impl Mips {
             }
         }
 
-        // Define/alias/tag replacement pass
+        // Define/alias/tag replacement and comment removal pass
         for (_i, line) in mips.lines.iter_mut().enumerate() {
+            if conf.remove_comments {
+                line.comment_opt = None;
+            }
             match line {
                 // Replace defines
                 Line {
@@ -465,56 +468,52 @@ impl Mips {
             }
         }
         // Argument and comment replacement pass
-        if conf.remove_comments {
-            for line in mips.lines.iter_mut() {
-                line.comment_opt = None;
-
-                for arg in line.stmt.iter_args_mut() {
-                    match arg {
-                        Arg::LineAbs(LineAbs(num)) if conf.remove_tags => {
-                            if let Some(key) = num.as_alias() {
-                                let i = tag_lines.get(key).expect(key);
-                                *num = Num::Lit(*i as f64);
-                            }
+        for line in mips.lines.iter_mut() {
+            for arg in line.stmt.iter_args_mut() {
+                match arg {
+                    Arg::LineAbs(LineAbs(num)) if conf.remove_tags => {
+                        if let Some(key) = num.as_alias() {
+                            let i = tag_lines.get(key).expect(key);
+                            *num = Num::Lit(*i as f64);
                         }
-                        Arg::Num(num) => {
-                            if let Some(key) = num.as_alias() {
-                                if let Some(alias) = mips.aliases.get(key) {
-                                    match alias {
-                                        Alias::Num(n) => {
-                                            if conf.remove_defines {
-                                                *arg = Arg::Num(Num::Lit(*n));
-                                            }
-                                        }
-                                        Alias::Reg(reg_base) => {
-                                            if conf.remove_reg_aliases {
-                                                *arg = Arg::Reg(Reg::Base(*reg_base));
-                                            }
-                                        }
-                                        Alias::Dev(_) => {
-                                            panic!();
+                    }
+                    Arg::Num(num) => {
+                        if let Some(key) = num.as_alias() {
+                            if let Some(alias) = mips.aliases.get(key) {
+                                match alias {
+                                    Alias::Num(n) => {
+                                        if conf.remove_defines {
+                                            *arg = Arg::Num(Num::Lit(*n));
                                         }
                                     }
+                                    Alias::Reg(reg_base) => {
+                                        if conf.remove_reg_aliases {
+                                            *arg = Arg::Reg(Reg::Base(*reg_base));
+                                        }
+                                    }
+                                    Alias::Dev(_) => {
+                                        panic!();
+                                    }
                                 }
-                                // *num = Num::Lit()
                             }
+                            // *num = Num::Lit()
                         }
-                        Arg::Reg(Reg::Alias { key, .. }) => {
-                            if conf.remove_reg_aliases {
-                                let reg_base = mips.aliases.try_get_reg_base(key).unwrap();
-                                *arg = Arg::Reg(Reg::Base(reg_base));
-                            }
-                        }
-                        Arg::Dev(Dev::Alias(key)) => {
-                            if conf.remove_dev_aliases {
-                                let dev_base = mips.aliases.try_get_dev_base(key).unwrap();
-                                *arg = Arg::Dev(Dev::Base(dev_base));
-                            }
-                        }
-                        // Arg::String(key) => {
-                        // }
-                        _ => {}
                     }
+                    Arg::Reg(Reg::Alias { key, .. }) => {
+                        if conf.remove_reg_aliases {
+                            let reg_base = mips.aliases.try_get_reg_base(key).unwrap();
+                            *arg = Arg::Reg(Reg::Base(reg_base));
+                        }
+                    }
+                    Arg::Dev(Dev::Alias(key)) => {
+                        if conf.remove_dev_aliases {
+                            let dev_base = mips.aliases.try_get_dev_base(key).unwrap();
+                            *arg = Arg::Dev(Dev::Base(dev_base));
+                        }
+                    }
+                    // Arg::String(key) => {
+                    // }
+                    _ => {}
                 }
             }
         }

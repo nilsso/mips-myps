@@ -437,7 +437,7 @@ impl Translator {
                     let a = Arg::Num(Num::Reg(i_reg_base));
                     let b = Arg::Num(e_num);
                     let c = Arg::LineRel(0.into());
-                    vec![Stmt::Brlt([a, b, c])]
+                    vec![Stmt::Brge([a, b, c])]
                 };
                 // Translate body items to lines
                 let mut body_lines = self.translate_items(items).unwrap();
@@ -954,6 +954,7 @@ impl Translator {
             Func::Abs  ([a   ]) => translate_fun!(self, reg_base_opt, [a   ], Stmt::Abs),
             Func::Acos ([a   ]) => translate_fun!(self, reg_base_opt, [a   ], Stmt::Acos),
             Func::Asin ([a   ]) => translate_fun!(self, reg_base_opt, [a   ], Stmt::Asin),
+            Func::Atan ([a   ]) => translate_fun!(self, reg_base_opt, [a   ], Stmt::Atan),
             Func::Ceil ([a   ]) => translate_fun!(self, reg_base_opt, [a   ], Stmt::Ceil),
             Func::Cos  ([a   ]) => translate_fun!(self, reg_base_opt, [a   ], Stmt::Cos),
             Func::Exp  ([a   ]) => translate_fun!(self, reg_base_opt, [a   ], Stmt::Exp),

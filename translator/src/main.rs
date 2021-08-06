@@ -43,8 +43,8 @@ fn main() {
             optimize_registers: true,
             // optimize_registers: false,
 
-            // remove_comments: true,
-            remove_comments: false,
+            remove_comments: true,
+            // remove_comments: false,
 
             remove_empty: true,
             // remove_empty: false,
@@ -55,8 +55,8 @@ fn main() {
             remove_reg_aliases: true,
             // remove_reg_aliases: false,
 
-            // remove_dev_aliases: true,
-            remove_dev_aliases: false,
+            remove_dev_aliases: true,
+            // remove_dev_aliases: false,
 
             remove_defines: true,
             // remove_defines: false,

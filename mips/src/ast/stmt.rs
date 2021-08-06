@@ -285,7 +285,7 @@ def_stmt!(
     (Ceil,   "ceil",   2, "reg,num",           [R, N]),
     (Cos,    "cos",    2, "reg,num",           [R, N]),
     (Div,    "div",    3, "reg,num,num",       [R, N, N]),
-    (Exp,    "expr",   2, "reg,num",           [R, N]),
+    (Exp,    "exp",    2, "reg,num",           [R, N]),
     (Floor,  "floor",  2, "reg,num",           [R, N]),
     (Log,    "log",    2, "reg,num",           [R, N]),
     (Max,    "max",    3, "reg,num,num",       [R, N, N]),
