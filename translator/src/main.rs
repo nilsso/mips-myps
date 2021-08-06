@@ -74,8 +74,8 @@ fn main() {
     }
     println!("--------------------------------------------------------------------------------");
     for (_i, line) in mips.lines.iter().enumerate() {
-        // println!("{:>w$}: {}", _i, line, w = w);
-        println!("{}", line);
+        println!("{:>w$}: {}", _i, line, w = w);
+        // println!("{}", line);
     }
     // for (i, (index, (s, e))) in mips.analyze_lifetimes().iter().enumerate() {
     //     println!("{}: {} ({},{})", i, index, s, e);

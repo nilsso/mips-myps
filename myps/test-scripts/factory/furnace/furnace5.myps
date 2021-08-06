@@ -46,8 +46,8 @@ def fH = (50100) / 50000
 
 # "P" term coefficients
 # (NOTE: Tweaking could increase result speed)
-def KPF = 0.3 # Furnace volume proportional term
-def KPC = 0.3 # Cold source proportional term
+def KPF = 0.5 # Furnace volume proportional term
+def KPC = 0.5 # Cold source proportional term
 def KPH = 0.5 # Hot source proportional term
 
 # Error bounds
@@ -69,8 +69,8 @@ pumpC.On                          =  1
 pumpC.Setting                     =  0
 pumpH.On                          =  1
 pumpH.Setting                     =  0
-AdvancedFurnace.all.SettingInput  =  0
 AdvancedFurnace.all.SettingOutput =  0
+AdvancedFurnace.all.SettingInput  =  0
 Filtration.all.On                 =  0
 DigitalValve.all.On               =  0
 
@@ -91,44 +91,43 @@ loop:
         nRH = (tC - tT) / (tF - tC)
 
         # Calculate moles to remove
-        nT  = (pT * vF) / (R * tT) # nT
-        fix nF  = AdvancedFurnace.all.TotalMoles.Sum
-        fix nR  = max(0, nT * max(nRC, nRH) + nF) # nR
+        nT     = (pT * vF) / (R * tT) # nT
+        fix nF = AdvancedFurnace.all.TotalMoles.Sum
+        fix nR = max(0, nT * max(nRC, nRH) + nF) # nR
 
         # Calculate C and H input moles
-        nI  = nT - nF + nR # nI
-        tI  = (tT * nT - tF * (nF - nR)) / nI # tI
+        nI      = nT - nF + nR # nI
+        tI      = (tT * nT - tF * (nF - nR)) / nI # tI
         fix nCI = nI * (tI - tH) / (tC - tH) # nCI
         fix nHI = nI - nCI # nHI
 
-        AdvancedFurnace.all.SettingInput = 1000
         fix nC = fC * tankC.TotalMoles
         fix nH = fH * tankH.TotalMoles
         tag AddRemoveLoop:
             rF = KPF*(nR * vF / nF)
-            rF = max(0, min(rFmax, rF))
+            # rF = min(rFmax, rF)
             AdvancedFurnace.all.SettingOutput = rF
 
-            rC = KPC*(nCI * vC / nC) # rC
-            rC = max(0, min(rCmax, rC))
+            rC  = KPC*(nCI * vC / nC) # rC
+            # rC = min(rCmax, rC)
             pumpC.Setting = rC # set rC
 
-            rH = KPH*(nHI * vH / nH) # rH
-            rH = max(0, min(rHmax, rH))
+            rH  = KPH*(nHI * vH / nH) # rH
+            # rH = min(rHmax, rH)
             pumpH.Setting = rH # set rH
 
             yield()
-            nFp  = nF
-            nF   = AdvancedFurnace.all.TotalMoles.Sum
-            nR  -= nFp - nF
+            nFp = nF
+            nF  = AdvancedFurnace.all.TotalMoles.Sum
+            nR  = max(0, nR - (nFp - nF))
 
-            nCp  = nC
-            nC   = fC * tankC.TotalMoles
-            nCI -= nCp - nC
+            nCp = nC
+            nC  = fC * tankC.TotalMoles
+            nCI = max(0, nCI - (nCp - nC))
 
-            nHp  = nH
-            nH   = fH * tankH.TotalMoles
-            nHI -= nHp - nH
+            nHp = nH
+            nH  = fH * tankH.TotalMoles
+            nHI = max(0, nHI - (nHp - nH))
 
             bgt(nR,  ERRORF, AddRemoveLoop)
             bgt(nCI, ERRORC, AddRemoveLoop)
@@ -141,12 +140,10 @@ loop:
         #yield()
         while PipeAnalyzer.all.TotalMoles.Sum > 0:
             yield()
+        AdvancedFurnace.all.SettingInput = 0
 
     elif ratioCO2 < 1.0:
         # Furnace gas filtration
-        #pumpC.Setting = 0
-        #pumpH.Setting = 0
-        AdvancedFurnace.all.SettingInput = 0
         Filtration.all.On = 1
         DigitalValve.all.On = 1
         yield()
@@ -154,15 +151,16 @@ loop:
         AdvancedFurnace.all.SettingOutput = 1000
         while AdvancedFurnace.all.TotalMoles.Sum > 0:
             yield()
+        AdvancedFurnace.all.SettingOutput = 0
+        yield()
 
         AdvancedFurnace.all.SettingInput = 1000
-        AdvancedFurnace.all.SettingOutput = 0
         while PipeAnalyzer.all.TotalMoles.Sum > 0:
             yield()
-
         AdvancedFurnace.all.SettingInput = 0
         Filtration.all.On = 0
         DigitalValve.all.On = 0
+        yield()
     #else:
     #    pumpC.Setting = 0
     #    pumpH.Setting = 0
