@@ -11,13 +11,21 @@
 # whatever it is given. If the target temperature is less-than the cold source temperature or
 # greater than the hot source temperature then wackiness will certainly occurr!
 # (I may change this point in the future)
-furnace   = d0
-tankC     = d1
-tankH     = d2
-pumpC     = d3
-pumpH     = d4
-analyzerI = d5
+# 
+# Things to consdier:
+# - If tF≈tT, tF≈tC or tF≈tH then algorithm is undefined
+#
+# For construction:
+# - The furnace, input pipe analyzer, waste digital valve and waste filtration
+#   should be data isolated.
+furnace      = d0
+tankC        = d1
+tankH        = d2
+pumpC        = d3
+pumpH        = d4
+progressDest = d5
 
+# Device hashes
 def AdvancedFurnace = 545937711
 def PipeAnalyzer    = 435685051
 def DigitalValve    = -1280984102
@@ -26,7 +34,6 @@ def Filtration      = -348054045
 # Constants
 def vF = 1000             # Furnace volume
 def R  = 8.31446261815324 # Universal gas consant
-def dt = 0.5              # Time step
 
 # Source volume-mole factor
 # (NOTE: ADJUST PER SETUP)
@@ -37,100 +44,77 @@ def vH = 50100
 def fC = (50100) / 50000
 def fH = (50100) / 50000
 
-# "PD" term coefficients
+# "P" term coefficients
 # (NOTE: Tweaking could increase result speed)
 def KPF = 0.3 # Furnace volume proportional term
-def KDF = 0.3 # Furnace volume derivative term
 def KPC = 0.3 # Cold source proportional term
-def KDC = 0.5 # Cold source derivative term
 def KPH = 0.5 # Hot source proportional term
-def KDH = 0.5 # Hot source derivative term
 
 # Error bounds
-def ERRORDENOM = 3
-def ERRORF = 1 # Error on initial furnace gas removal
-def ERRORC = 1 # Error on cold source transfer
-def ERRORH = 1 # Error on hot source transfer
-
-def ERRORT = 0.5
-def ERRORP = 0.5
+def ERRORT = 0.5 # Maximum temperature error
+def ERRORP = 0.5 # Maximum pressure error
 
 # Pump maximum bounds
-# (NOTE: These are optionally used down the PD loop)
 def rFmax = 1000 # Furnace output
 def rCmax = 1000 # Cold source pump
 def rHmax = 1000 # Hot source pump
 
 # Initialization
-db.Setting = -1
+db.Setting                        = -1
+pumpC.On                          =  1
+pumpC.Setting                     =  0
+pumpH.On                          =  1
+pumpH.Setting                     =  0
+AdvancedFurnace.all.SettingInput  =  0
+AdvancedFurnace.all.SettingOutput =  0
+Filtration.all.On                 =  0
+DigitalValve.all.On               =  0
 
-pumpC.On = 1
-pumpH.On = 1
-pumpC.Setting = 0
-pumpH.Setting = 0
-AdvancedFurnace.all.SettingInput = 0
-AdvancedFurnace.all.SettingOutput = 0
-Filtration.all.On = 0
-DigitalValve.all.On = 0
-
-#fix nCp = 0
-#fix nHp = 0
 loop:
     input = db.Setting # possibly trunc this
     tT = (input % 1000) * 10
     pT  = trunc(input / 1000) * 100 # pT
-
-    nC = fC * tankC.TotalMoles # nC
-    nH = fH * tankH.TotalMoles # nH
-
-    #mC = nCp - nC
-    #mH = nHp - nH
-    #nCp = nC
-    #nHp = nH
-    #nF0 = AdvancedFurnace.all.TotalMoles.Sum
-    #tF0 = AdvancedFurnace.all.Temperature.Sum
-    #tC  = tankC.Temperature # tC
-    #tH  = tankH.Temperature # tH
-    #nF = nF0 + mC + mH
-    #tF = (tF0*nF0 + tC*mC + tH*mH) / nF
     pF = AdvancedFurnace.all.Pressure.Sum
-
     tF = AdvancedFurnace.all.Temperature.Sum
 
     ratioCO2 = AdvancedFurnace.all.RatioCarbonDioxide.Sum
     # TODO: Calculate error from having a ratio under some fixed value
     if (ratioCO2 > 0.9) and (input > 0) and ((abs(tT - tF) > ERRORT) or (abs(pT - pF) > ERRORP)):
-        dontFilter = 1
-
+        # Calculate moles removed bounds
         tH  = tankH.Temperature # tH
-        #nRC = (tH - tF > ERRORDENOM) ? ((tT - tH) / (tH - tF)) : 0
         nRC = (tT - tH) / (tH - tF)
         tC  = tankC.Temperature # tC
-        #nRH = (tF - tC > ERRORDENOM) ? ((tC - tT) / (tF - tC)) : 0
         nRH = (tC - tT) / (tF - tC)
 
+        # Calculate moles to remove
         nT  = (pT * vF) / (R * tT) # nT
         nF  = AdvancedFurnace.all.TotalMoles.Sum
         nR  = max(0, nT * max(nRC, nRH) + nF) # nR
 
-        nI  = nT - nF + nR # nI
-        tI  = (tT * nT - tF * (nF - nR)) / nI # tI
-        #nCI = max(0, nI * (tI - tH) / (tC - tH)) # nCI
-        nCI = nI * (tI - tH) / (tC - tH) # nCI
-        nHI = nI - nCI # nHI
-
+        # Calculate and set furnace output
         rF   = KPF*(nR * vF / nF) # rF
         rF   = max(0, min(rFmax, rF))
         AdvancedFurnace.all.SettingOutput = rF
 
+        # Calculate C and H input moles
+        nI  = nT - nF + nR # nI
+        tI  = (tT * nT - tF * (nF - nR)) / nI # tI
+        nCI = nI * (tI - tH) / (tC - tH) # nCI
+        nHI = nI - nCI # nHI
+
+        # Calculate and set C pump
+        nC = fC * tankC.TotalMoles # nC
         rC   = KPC*(nCI * vC / nC) # rC
         rC   = max(0, min(rCmax, rC))
         pumpC.Setting = rC # set rC
 
+        # Set H pump
+        nH = fH * tankH.TotalMoles # nH
         rH   = KPH*(nHI * vH / nH) # rH
         rH   = max(0, min(rHmax, rH))
         pumpH.Setting = rH # set rH
 
+        # Let C and H pumps run for a tick then input result
         AdvancedFurnace.all.SettingInput = 0
         yield()
         pumpC.Setting = 0
@@ -141,6 +125,7 @@ loop:
             yield()
 
     elif ratioCO2 < 1.0:
+        # Furnace gas filtration
         pumpC.Setting = 0
         pumpH.Setting = 0
         AdvancedFurnace.all.SettingInput = 0
