@@ -16,6 +16,7 @@ progressDisp.Color   = BLUE
 progressDisp.Mode    = 1
 progressDisp.Setting = 0
 progressDisp.On = 0
+furnaceControl.Setting = -1
 
 db.Setting = 0
 
@@ -39,12 +40,14 @@ loop:
             tTDisp.Setting  = tT
             pTDisp.Setting  = pT
 
+            furnaceControl.Setting = targetCode
             currentCode = targetCode
         else:
+            furnaceControl.Setting = -1
             currentCode = -1
 
     pressedPrev = pressed
-    furnaceControl.Setting = currentCode
+    #furnaceControl.Setting = currentCode
     db.Setting = currentCode
     running = (currentCode != -1)
     tTDisp.On = running
