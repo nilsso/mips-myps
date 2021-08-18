@@ -108,6 +108,7 @@ lv = { lv_net_param | lv_dev_param | lv_def | lv_var }
     lv_dev_param = { dev_var ~ "." ~ token }
     lv_net_param = { dev_net ~ "." ~ token }
     lv_def = { "def" ~ var }
+        def_fixed = { "fix" ~ lv_def }
     lv_var = { var_fixed | var }
         var_fixed = { "fix" ~ var }
 

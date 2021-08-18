@@ -1,0 +1,19 @@
+def ChipID = 30
+BusMemory = d0
+
+tag MainLoop:
+    rCommand = BusMemory.Setting
+    if rCommand < 1000000:
+        j(MainLoop)
+    rTargetID = trunc(rCommand / 10000)
+    if rTargetID == 99:
+        j(Doit)
+    elif rTargetID == ChipID:
+        j(Doit)
+    else:
+        j(MainLoop)
+tag Doit:
+    rTargetPin = trunc((rCommand-(rTargetID * 10000))/1000)
+    rTargetCMD = trunc((rCommand-(rTargetID * 10000)-(rTargetPin*1000)))
+    rTargetPin = rTargetPin  - 1
+    d(rTargetPin).Setting = rTargetCMD

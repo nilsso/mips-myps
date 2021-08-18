@@ -1022,7 +1022,11 @@ impl Translator {
                 Ok((dev_base, Vec::new()))
             }
             myps::ast::Dev::Expr(box expr) => {
-                let (index_num, index_stmts) = self.translate_expr(None, expr).unwrap();
+                let (mut index_num, index_stmts) = self.translate_expr(None, expr).unwrap();
+                index_num.set_fixed(true);
+                // if let Num::Reg(reg_base) = index_num {
+                    // reg_base.set_fixed(true);
+                // }
                 match index_num {
                     Num::Lit(i) => {
                         let index = (i >= 0_f64)

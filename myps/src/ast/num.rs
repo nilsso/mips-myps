@@ -40,6 +40,13 @@ impl Num {
             _ => self,
         }
     }
+
+    pub fn set_fixed(&mut self, fixed: bool) {
+        match self {
+            Self::Var(var) => var.fixed = fixed,
+            _ => {},
+        }
+    }
 }
 
 impl From<Expr> for Num {

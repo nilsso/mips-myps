@@ -50,6 +50,14 @@ impl<'i> MipsNode<'i> for Num {
             _ => None,
         }
     }
+
+    fn set_fixed(&mut self, fixed: bool) {
+        match self {
+            Self::Lit(_) => {},
+            Self::Reg(reg_base) => reg_base.set_fixed(fixed),
+            Self::Alias(_) => {},
+        }
+    }
 }
 
 impl<'i> AstNode<'i, Rule, MipsParser, MipsError> for Num {

@@ -26,6 +26,7 @@ impl<'i> AstNode<'i, Rule, MipsParser, MipsError> for DevLit {
 
     fn try_from_pair(pair: Pair) -> MipsResult<Self::Output> {
         match pair.as_rule() {
+            // Rule::dev_
             Rule::dev => {
                 let indirections = pair.as_str().bytes().filter(|b| *b == b'r').count();
                 let index = pair.only_inner()?.as_str().parse()?;
@@ -47,6 +48,26 @@ impl Display for DevLit {
         }
         write!(f, "{}", self.index)
     }
+}
+
+impl<'i> MipsNode<'i> for DevLit {
+    fn as_reg_base(&self) -> Option<RegBase> {
+        if self.indirections > 0 {
+            Some(RegBase::new_lit(self.index, self.indirections - 1, true))
+        } else {
+            None
+        }
+    }
+
+    fn as_reg_base_mut(&mut self) -> Option<&mut RegBase> {
+        None
+    }
+
+    fn as_alias(&self) -> Option<&String> {
+        None
+    }
+
+    fn set_fixed(&mut self, _fixed: bool) {}
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -78,6 +99,26 @@ impl<'i> AstNode<'i, Rule, MipsParser, MipsError> for DevBase {
             _ => Err(MipsError::pair_wrong_rule("a base device", pair)),
         }
     }
+}
+
+impl<'i> MipsNode<'i> for DevBase {
+    fn as_reg_base(&self) -> Option<RegBase> {
+        if let Self::Lit(dev_lit) = self {
+            dev_lit.as_reg_base()
+        } else {
+            None
+        }
+    }
+
+    fn as_reg_base_mut(&mut self) -> Option<&mut RegBase> {
+        None
+    }
+
+    fn as_alias(&self) -> Option<&String> {
+        None
+    }
+
+    fn set_fixed(&mut self, _fixed: bool) {}
 }
 
 impl Display for DevBase {
@@ -124,19 +165,10 @@ impl From<DevLit> for Dev {
 
 impl<'i> MipsNode<'i> for Dev {
     fn as_reg_base(&self) -> Option<RegBase> {
-        match self {
-            &Self::Base(DevBase::Lit(DevLit {
-                index,
-                indirections,
-            })) if indirections > 0 => {
-                let reg_lit = RegLit {
-                    index,
-                    indirections,
-                    fix_mode: FixMode::None,
-                };
-                Some(RegBase::Lit(reg_lit))
-            }
-            _ => None,
+        if let Self::Base(dev_base) = self {
+            dev_base.as_reg_base()
+        } else {
+            None
         }
     }
 
@@ -150,6 +182,8 @@ impl<'i> MipsNode<'i> for Dev {
             _ => None,
         }
     }
+
+    fn set_fixed(&mut self, _fixed: bool) {}
 }
 
 impl<'i> AstNode<'i, Rule, MipsParser, MipsError> for Dev {

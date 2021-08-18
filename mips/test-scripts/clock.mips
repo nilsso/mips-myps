@@ -1,0 +1,124 @@
+###24 Hour Clock - Any Sensor Position###
+#By ThePez, correction math from CowsAreEvil#
+
+############Sensor Position Configuration###########
+#Change according to your placement of your sensor
+#Floor/South Wall=0, Ceiling/North Wall=1,
+#East Wall=-1, West Wall= -2
+define type 1
+#Data port direction
+#For Any North/Down=1,South/Up=2
+#For Floor and South Wall positions
+#East & Left=3, West & Right=4
+#For Ceiling or North Wall
+#East & Right=3, West & Left=4
+define DP 1
+#Setup
+alias clock d0
+alias sensor d1
+alias vangle r15
+alias hangle r14
+# (hangle and correctedangle could probably be the same register, hangle is only needed at the start, then it get converted to corrected, that both vertical and corrected merge into corrected)
+alias correctedangle r13
+alias noon r12
+alias solarmem r11 # FIX (needs to keep last ticks value for a compare)
+alias hour r10 # FIX (only needed in the final part of code)
+alias minute r9 # FIX (only needed in the final part of code)
+define DEGRAD 57.288 #180/3.142
+start:
+yield
+l vangle sensor Vertical
+l hangle sensor Horizontal
+beq type -1 eastwall
+beq type -2 westwall
+brgtz type 5
+beq DP 1 FSWNorth
+beq DP 2 FSWSouth
+beq DP 3 FSWEast
+beq DP 4 FSWWest
+beq DP 1 CNWNorth
+beq DP 2 CNWSouth
+beq DP 3 CNWEast
+beq DP 4 CNWWest
+FSWNorth:#Down
+add correctedangle 180 hangle
+j correction
+FSWSouth:#Up
+move correctedangle hangle
+bgez hangle correction
+add correctedangle hangle 360
+j correction
+FSWEast:#Left
+sub correctedangle hangle 90
+bge hangle 90 correction
+add correctedangle hangle 270
+j correction
+FSWWest:#Right
+add correctedangle hangle 90
+bgez correctedangle correction
+add correctedangle correctedangle 360
+j correction
+CNWNorth:#Down
+sub correctedangle 180 hangle
+j correction
+CNWSouth:#Up
+sub correctedangle 360 hangle
+blt correctedangle 360 correction
+sub correctedangle correctedangle 360
+j correction
+CNWEast:#Right
+sub correctedangle 270 hangle
+bgt hangle -90 correction
+sub correctedangle -90 hangle
+j correction
+CNWWest:#Left
+sub correctedangle 90 hangle
+ble hangle 90 correction
+sub correctedangle 450 hangle
+j correction
+eastwall:
+move r0 vangle
+sgt noon r0 solarmem#true at night
+move solarmem r0
+brnez noon 3
+sub correctedangle 270 vangle
+j calctime
+add correctedangle 270 vangle
+blt vangle 90 calctime
+sub correctedangle vangle 90
+j calctime
+westwall:
+move r0 vangle
+sgt noon r0 solarmem#true at day
+move solarmem r0
+breqz noon 3
+add correctedangle 90 vangle
+j calctime
+sub correctedangle 90 vangle
+ble vangle 90 calctime
+sub correctedangle 450 vangle
+j calctime
+correction:
+move hangle correctedangle
+div vangle vangle DEGRAD
+div hangle hangle DEGRAD
+sin r1 hangle
+sin r2 vangle
+mul r0 r1 r2
+asin correctedangle r0
+mul correctedangle correctedangle DEGRAD
+blt hangle 1.571 calctime
+sub correctedangle 180 correctedangle
+blt hangle 4.713 calctime
+sub correctedangle 540 correctedangle
+calctime:
+s db Setting correctedangle
+div r0 correctedangle 15
+trunc hour r0
+sub minute r0 hour
+mul minute minute 60
+trunc minute minute
+div minute minute 100
+add r0 hour minute
+s clock Setting r0
+j start

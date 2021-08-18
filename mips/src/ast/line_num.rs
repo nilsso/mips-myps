@@ -26,6 +26,10 @@ impl<'i> MipsNode<'i> for LineAbs {
         // self.0.as_alias()
         None
     }
+
+    fn set_fixed(&mut self, fixed: bool) {
+        self.0.set_fixed(fixed);
+    }
 }
 
 impl From<f64> for LineAbs {
@@ -77,6 +81,10 @@ impl<'i> MipsNode<'i> for LineRel {
 
     fn as_alias(&self) -> Option<&String> {
         self.0.as_alias()
+    }
+
+    fn set_fixed(&mut self, fixed: bool) {
+        self.0.set_fixed(fixed);
     }
 }
 

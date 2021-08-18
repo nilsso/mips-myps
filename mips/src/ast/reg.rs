@@ -1,40 +1,24 @@
 use std::{fmt, fmt::Display};
 
-use crate::ast::MipsNode;
+use crate::ast::{MipsNode, FixMode};
 use crate::{Aliases, MipsError, MipsParser, MipsResult, Pair, Rule};
 use ast_traits::{AstNode, AstPair, IntoAst};
-
-#[derive(Copy, Clone, Hash, Debug)]
-pub enum FixMode {
-    None,
-    Fixed,
-    Scoped(usize, usize),
-}
-
-impl From<bool> for FixMode {
-    fn from(fixed: bool) -> Self {
-        if fixed {
-            Self::Fixed
-        } else {
-            Self::None
-        }
-    }
-}
-
-impl From<&FixMode> for bool {
-    fn from(fix_mode: &FixMode) -> bool {
-        match fix_mode {
-            FixMode::Fixed | FixMode::Scoped(..) => true,
-            FixMode::None => false,
-        }
-    }
-}
 
 #[derive(Copy, Clone, Hash, Debug)]
 pub struct RegLit {
     pub index: usize,
     pub indirections: usize,
     pub fix_mode: FixMode,
+}
+
+impl RegLit {
+    pub fn new(index: usize, indirections: usize, fix_mode: FixMode) -> Self {
+        Self {
+            index,
+            indirections,
+            fix_mode,
+        }
+    }
 }
 
 impl<'i> AstNode<'i, Rule, MipsParser, MipsError> for RegLit {
@@ -116,6 +100,30 @@ impl RegBase {
         match self {
             Self::Lit(reg_lit) => Some(reg_lit),
             _ => None,
+        }
+    }
+}
+
+impl<'i> MipsNode<'i> for RegBase {
+    fn as_reg_base(&self) -> Option<RegBase> {
+        Some(*self)
+    }
+
+    fn as_reg_base_mut(&mut self) -> Option<&mut RegBase> {
+        Some(self)
+    }
+
+    fn as_alias(&self) -> Option<&String> {
+        None
+    }
+
+    fn set_fixed(&mut self, fixed: bool) {
+        if let Self::Lit(reg_lit) = self {
+            reg_lit.fix_mode = if fixed {
+                FixMode::Fixed
+            } else {
+                FixMode::None
+            };
         }
     }
 }
@@ -220,6 +228,13 @@ impl<'i> MipsNode<'i> for Reg {
         match self {
             Self::Alias { key, .. } => Some(key),
             _ => None,
+        }
+    }
+
+    fn set_fixed(&mut self, fixed: bool) {
+        match self {
+            Self::Base(reg_base) => reg_base.set_fixed(fixed),
+            Self::Alias { fixed: f, .. } => *f = fixed,
         }
     }
 }

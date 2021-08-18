@@ -87,6 +87,18 @@ impl<'i> MipsNode<'i> for Arg {
             Self::String(..) => None,
         }
     }
+
+    fn set_fixed(&mut self, fixed: bool) {
+        #[rustfmt::skip]
+        match self {
+            Self::Dev(dev)          => dev.set_fixed(fixed),
+            Self::Reg(reg)          => reg.set_fixed(fixed),
+            Self::Num(num)          => num.set_fixed(fixed),
+            Self::LineAbs(line_abs) => line_abs.set_fixed(fixed),
+            Self::LineRel(line_rel) => line_rel.set_fixed(fixed),
+            Self::String(_) => {},
+        }
+    }
 }
 
 impl From<RegBase> for Arg {

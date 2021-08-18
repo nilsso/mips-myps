@@ -6,12 +6,40 @@ pub use ast_traits::AstNode;
 // pub type ReagentMode = ast_common::ReagentMode;
 // pub type ReagentMode<'a> = ast_common::ReagentMode<'a, Rule, MipsParser, MipsError>;
 
+#[derive(Copy, Clone, Hash, Debug)]
+pub enum FixMode {
+    None,
+    Fixed,
+    Scoped(usize, usize),
+}
+
+impl From<bool> for FixMode {
+    fn from(fixed: bool) -> Self {
+        if fixed {
+            Self::Fixed
+        } else {
+            Self::None
+        }
+    }
+}
+
+impl From<&FixMode> for bool {
+    fn from(fix_mode: &FixMode) -> bool {
+        match fix_mode {
+            FixMode::Fixed | FixMode::Scoped(..) => true,
+            FixMode::None => false,
+        }
+    }
+}
+
 pub trait MipsNode<'i>: AstNode<'i, Rule, MipsParser, MipsError> + std::fmt::Debug {
     fn as_reg_base(&self) -> Option<RegBase>;
 
     fn as_reg_base_mut(&mut self) -> Option<&mut RegBase>;
 
     fn as_alias(&self) -> Option<&String>;
+
+    fn set_fixed(&mut self, fixed: bool);
 
     // fn reduce(self, mips: &Mips) -> MipsResult<Self> where Self: Sized;
 
@@ -67,7 +95,7 @@ mod dev;
 pub use dev::{Dev, DevBase, DevLit};
 
 mod reg;
-pub use reg::{FixMode, Reg, RegBase, RegLit};
+pub use reg::{Reg, RegBase, RegLit};
 
 mod num;
 pub use num::{Num, NumLit};

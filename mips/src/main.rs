@@ -40,15 +40,15 @@ fn main() {
         .optimize(OptimizationConfig {
             optimize_registers: true,
             // optimize_registers: false,
-            remove_comments: true,
-            // remove_comments: false,
+            // remove_comments: true,
+            remove_comments: false,
             remove_empty: true,
             // remove_empty: false,
-            remove_empty_comments: true,
-            // remove_empty_comments: false,
+            // remove_empty_comments: true,
+            remove_empty_comments: false,
 
-            // remove_reg_aliases: true,
-            remove_reg_aliases: false,
+            remove_reg_aliases: true,
+            // remove_reg_aliases: false,
 
             remove_dev_aliases: true,
             // remove_dev_aliases: false,
