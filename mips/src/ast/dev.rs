@@ -1,6 +1,6 @@
 use std::{fmt, fmt::Display};
 
-use crate::ast::{FixMode, MipsNode, RegBase, RegLit};
+use crate::ast::{MipsNode, RegBase};
 use crate::{Aliases, MipsError, MipsParser, MipsResult, Pair, Rule};
 use ast_traits::{AstNode, AstPair, IntoAst};
 

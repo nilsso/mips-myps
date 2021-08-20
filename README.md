@@ -7,3 +7,5 @@
 * Add some kind of constants library for both MIPS and MYPS to use
 (things like logic enumerations; "Horizontal: 20"). Going to need to think long
 and hard about how to implement logic types and other game constants here.
+* Add `break` grammar for `loop`, `while` and `for` (equivalent to a tag after the block and a jump
+  to tag).

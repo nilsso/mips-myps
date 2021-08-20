@@ -389,7 +389,6 @@ impl Mips {
 
         if conf.optimize_registers {
             let lifetimes = mips.analyze_lifetimes();
-            println!("{:#?}", lifetimes);
             let n = lifetimes.len();
             let node_iter = lifetimes
                 .iter()
@@ -413,7 +412,6 @@ impl Mips {
                     (index, color)
                 })
                 .collect::<BTreeMap<_, _>>();
-            println!("COLORS {:#?}", colors);
             for line in mips.lines.iter_mut() {
                 for arg in line.stmt.iter_args_mut() {
                     if let Arg::Dev(Dev::Base(DevBase::Lit(dev_lit))) = arg {
@@ -665,50 +663,38 @@ impl Mips {
         // }
 
         let scope_tuple = |i, fix_mode| {
-            let res = match fix_mode {
+            match fix_mode {
                 FixMode::None => (i, i),
                 FixMode::Fixed => (0, self.lines.len() - 1),
                 FixMode::Scoped(s, e) => (s, e),
-            };
-            // println!("scope_tuple ({},{:?}) -> {:?}", i, fix_mode, res);
-            res
+            }
         };
 
         // Fixed/scoped pass
         for (line_num, line) in self.lines.iter().enumerate() {
-            for (arg, reg_lit) in line.stmt.args().iter().rev().filter_map(|arg| {
+            for (_arg, reg_lit) in line.stmt.args().iter().rev().filter_map(|arg| {
                 // arg.as_reg_lit()
                 let opt = arg.get_reg_lit(self);
-                // println!("{:?} -> {:?}", arg, opt);
                 opt.expect(&format!(
                     "Fatal error analyzing lifetimes\nLINE {}: {:?}\nARG: {:?}",
                     line_num, line, arg
                 ))
                 .map(|reg_lit| (arg, reg_lit))
             }) {
-                println!("{:?} -> {:?}", arg, reg_lit);
                 #[rustfmt::skip]
                 let RegLit { index, fix_mode, .. } = reg_lit;
-                // if matches!(arg, Arg::Reg(..)) {
-                    match fix_mode {
-                        FixMode::None => {}
-                        FixMode::Fixed | FixMode::Scoped(..) => {
-                            let (s, e) = scope_tuple(line_num, fix_mode);
-                            if let Some((s_old, e_old)) = lifetimes.get_mut(&index) {
-                                *s_old = s.min(*s_old);
-                                *e_old = e.max(*e_old);
-                            } else {
-                                lifetimes.insert(index, (s, e));
-                            }
+                match fix_mode {
+                    FixMode::None => {}
+                    FixMode::Fixed | FixMode::Scoped(..) => {
+                        let (s, e) = scope_tuple(line_num, fix_mode);
+                        if let Some((s_old, e_old)) = lifetimes.get_mut(&index) {
+                            *s_old = s.min(*s_old);
+                            *e_old = e.max(*e_old);
+                        } else {
+                            lifetimes.insert(index, (s, e));
                         }
                     }
-                // } else {
-                //     // As r-value
-                //     let (_s, e) = lifetimes.entry(index).or_insert((line_num, line_num));
-                //     if *e < line_num {
-                //         *e = line_num;
-                //     }
-                // }
+                }
             }
         }
 
@@ -734,10 +720,6 @@ impl Mips {
                         FixMode::Fixed | FixMode::Scoped(..) => {}
                         FixMode::None => {
                             let new_scope = scope_tuple(line_num, fix_mode);
-
-                            // if let Some(old_lifetime) = lifetimes.insert(index, scope) {
-                            //     res.push((index, old_lifetime));
-                            // }
                             let (s_new, _) = new_scope;
                             if let Some((s_old, e_old)) = lifetimes.get_mut(&index) {
                                 if s_new >= *e_old {

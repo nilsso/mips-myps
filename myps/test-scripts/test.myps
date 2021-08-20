@@ -1,9 +1,3 @@
-a = 0
-v = d0.Setting
-if v == 0:
-    a = 1
-elif v == 1:
-    a = 2
-else:
-    a = 3
-
+a = 1
+#a = a * (a + 1)
+a *= a + 1

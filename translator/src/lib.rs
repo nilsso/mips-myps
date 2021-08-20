@@ -505,7 +505,7 @@ impl Translator {
     }
 
     fn translate_stmt(&mut self, stmt: myps::ast::Stmt) -> MipsResult<Vec<mips::ast::Stmt>> {
-        use mips::ast::{Arg, Stmt};
+        use mips::ast::{Arg, Stmt, Num};
         use myps::ast::{Lv, Var};
         use std::iter::once;
 
@@ -538,7 +538,7 @@ impl Translator {
 
                 let reg_base = self.try_get_reg(&key).unwrap();
                 let r = reg_base.into();
-                let a = reg_base.into();
+                let a = Num::Reg(reg_base).into();
                 let (b_num, b_stmts) = self.translate_expr(None, rhs).unwrap();
                 let b = b_num.into();
                 let stmt = match op {
